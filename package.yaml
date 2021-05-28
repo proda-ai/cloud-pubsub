@@ -67,6 +67,7 @@ library:
     - Cloud.PubSub.IO
     - Cloud.PubSub.Logger
     - Cloud.PubSub.Publisher
+    - Cloud.PubSub.Publisher.IO
     - Cloud.PubSub.Publisher.Types
     - Cloud.PubSub.Schema
     - Cloud.PubSub.Schema.Types

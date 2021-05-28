@@ -1,12 +1,9 @@
 module Cloud.PubSub.PublisherSpec where
 
-import qualified Cloud.PubSub.Auth.Token       as AuthToken
-import qualified Cloud.PubSub.Auth.Types       as AuthT
 import qualified Cloud.PubSub.Core.Types       as CoreT
-import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.IO               as PubSubIO
-import qualified Cloud.PubSub.Logger           as Logger
 import qualified Cloud.PubSub.Publisher        as Publisher
+import qualified Cloud.PubSub.Publisher.IO     as PublisherIO
 import qualified Cloud.PubSub.Publisher.Types  as PublisherT
 import qualified Cloud.PubSub.Subscription     as Subscription
 import qualified Cloud.PubSub.Subscription.Types
@@ -16,18 +13,9 @@ import           Cloud.PubSub.TestHelpers       ( convertMessage
                                                 , withTestSub
                                                 , withTestTopic
                                                 )
-import           Control.Monad.Catch            ( MonadCatch
-                                                , MonadMask
-                                                , MonadThrow
-                                                , bracket
-                                                )
-import           Control.Monad.IO.Class         ( MonadIO
-                                                , liftIO
-                                                )
+import           Control.Monad.Catch            ( bracket )
+import           Control.Monad.IO.Class         ( liftIO )
 import qualified Control.Monad.Reader          as Reader
-import           Control.Monad.Reader           ( MonadReader
-                                                , ReaderT
-                                                )
 import qualified Data.ByteString.Char8         as C8
 import           Test.Hspec
 
@@ -37,38 +25,13 @@ publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
                                              , maxBatchDelay       = 0.1
                                              }
 
-data PublisherEnv = PublisherEnv
-  { logger             :: Logger.Logger
-  , clientResources    :: HttpT.ClientResources
-  , publisherResources :: PublisherT.PublisherResources
-  }
 
-newtype TestM a = TestM
-  { runTestM :: ReaderT PublisherEnv IO a }
-  deriving newtype(
-    Functor, Applicative, Monad, MonadFail,
-    MonadIO, MonadThrow, MonadCatch, MonadMask,
-    MonadReader PublisherEnv)
-
-instance HttpT.HasClientResources TestM where
-  askClientResources = Reader.asks clientResources
-instance HttpT.HasGoogleProjectId TestM
-instance HttpT.HasPubSubHttpManager TestM
-
-instance AuthT.GoogleApiAuth TestM where
-  getToken = AuthToken.getToken
-
-instance Logger.HasLogger TestM where
-  askLogger = Reader.asks logger
-
-instance PublisherT.HasPublisherResources TestM where
-  askPublisherResources = Reader.asks publisherResources
-
-runTest :: TestM a -> PubSubIO.PubSubEnv -> IO a
+runTest :: PublisherIO.PublisherIO a -> PubSubIO.PubSubEnv -> IO a
 runTest action pubSubEnv@(PubSubIO.PubSubEnv envLogger envClientResources) = do
   bracket acquire release $ \pubResources ->
-    let publishEnv = PublisherEnv envLogger envClientResources pubResources
-    in  Reader.runReaderT (runTestM action) publishEnv
+    let publishEnv =
+          PublisherIO.PublisherEnv envLogger envClientResources pubResources
+    in  Reader.runReaderT (PublisherIO.runPublisherIO action) publishEnv
  where
   publisherImpl = Publisher.mkPublisherImpl pubSubEnv
   acquire =
