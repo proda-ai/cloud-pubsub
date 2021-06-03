@@ -8,5 +8,7 @@ On top of the basic endpoints there is a higher-level producer that is capable o
 
 There is a plan to offer a higher-level message processor to pull messages from a subscription, to process them and then acknowledge them.
 
+Please note that the Cloud PubSub Emulator [does not support all features](https://cloud.google.com/pubsub/docs/emulator#supported_features), so some tests are only run when they are run against the real Cloud PubSub service.
+
 ## License
 This software is under the BSD 3 License.

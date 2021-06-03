@@ -13,6 +13,7 @@ import           Cloud.PubSub.Http.Types        ( ClientResources(..)
 import           Cloud.PubSub.IO                ( PubSubEnv(..) )
 import qualified Cloud.PubSub.Logger           as Logger
 import qualified Control.Concurrent.MVar       as MVar
+import           Data.Maybe                     ( fromMaybe )
 import           Data.Time                      ( NominalDiffTime )
 import qualified Network.HTTP.Client           as HttpClient
 import qualified Network.HTTP.Client.TLS       as HttpClientTLS
@@ -22,6 +23,7 @@ newtype AuthMethod = ServiceAccountFile FilePath
 
 data GoogleApiConfig = GoogleApiConfig
   { authMethod          :: AuthMethod
+  , baseUrl             :: Maybe String
   , tokenRenewThreshold :: NominalDiffTime
   }
   deriving (Show, Eq)
@@ -34,6 +36,8 @@ mkClientResources config = case authMethod config of
       <*> MVar.newMVar NotInitialized
       <*> HttpClient.newManager HttpClientTLS.tlsManagerSettings -- Manager closed automatically
       <*> pure (tokenRenewThreshold config)
+      <*> pure (fromMaybe pubsubDefaultUrl (baseUrl config))
+  where pubsubDefaultUrl = "https://pubsub.googleapis.com"
 
 mkPubSubEnv :: GoogleApiConfig -> Logger.Logger -> IO PubSubEnv
 mkPubSubEnv c l = PubSubEnv l <$> mkClientResources c

@@ -28,6 +28,7 @@ data ClientResources = ClientResources
   , crCachedTokenMVar :: MVar TokenContainer
   , crManager         :: Manager
   , crRenewThreshold  :: NominalDiffTime
+  , crBaseUrl         :: String
   }
 
 newtype QueryParams = QueryParams {unwrapQueryParams :: [(ByteString, Maybe ByteString)]}
@@ -41,6 +42,9 @@ class HasPubSubHttpManager m where
   askPubSubManger :: m Manager
   default askPubSubManger :: (HasClientResources m, Functor  m) => m Manager
   askPubSubManger = crManager <$> askClientResources
+  askBaseUrl :: m String
+  default askBaseUrl :: (HasClientResources m, Functor  m) => m String
+  askBaseUrl = crBaseUrl <$> askClientResources
 
 class HasGoogleProjectId m where
   askProjectId :: m ProjectId

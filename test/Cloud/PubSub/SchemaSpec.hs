@@ -2,13 +2,13 @@
 
 module Cloud.PubSub.SchemaSpec where
 
-import qualified Cloud.PubSub.IO               as PubSubIO
 import           Cloud.PubSub.Core.Types        ( Base64DataString(..) )
 import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Schema           as Schema
 import qualified Cloud.PubSub.Schema.Types     as SchemaT
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
-                                                , runTest
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv                                                
+                                                , runTestIfNotEmulator
                                                 )
 import qualified Cloud.PubSub.Topic.Types      as TopicT
 import           Control.Monad.IO.Class         ( liftIO )
@@ -53,8 +53,8 @@ withTestSchema schemaName schemaType schemaDef action = do
     Right cs -> return cs
     Left  e  -> error $ "unexpected existing schema " <> show e
 
-schemaManagementTest :: PubSubIO.PubSubEnv -> IO ()
-schemaManagementTest = runTest $ do
+schemaManagementTest :: TestEnv -> IO ()
+schemaManagementTest = runTestIfNotEmulator $ do
   Schema.delete schemaName
   Right createdSchema <- Schema.create schemaName SchemaT.Avro sampleAvroSchema
   fetchedSchema       <- Schema.get schemaName SchemaT.Full
@@ -65,16 +65,16 @@ schemaManagementTest = runTest $ do
   liftIO $ fetchedSchema `shouldBe` expected
   where schemaName = "schema-management-test"
 
-duplicateSchemaTest :: PubSubIO.PubSubEnv -> IO ()
+duplicateSchemaTest :: TestEnv -> IO ()
 duplicateSchemaTest =
-  runTest $ withTestSchema schemaName SchemaT.Avro sampleAvroSchema $ \_ -> do
+  runTestIfNotEmulator $ withTestSchema schemaName SchemaT.Avro sampleAvroSchema $ \_ -> do
     result <- Schema.create schemaName SchemaT.Avro sampleAvroSchema
     liftIO $ result `shouldBe` Left SchemaT.SchemaAlreadyExists
   where schemaName = "duplicate-schema-test"
 
-schemaListTest :: PubSubIO.PubSubEnv -> IO ()
+schemaListTest :: TestEnv -> IO ()
 schemaListTest =
-  runTest
+  runTestIfNotEmulator
     $ withTestSchema schemaName SchemaT.Avro sampleAvroSchema
     $ \createdSchema -> do
         fetchedSchemas <- SchemaT.schemas <$> Schema.list SchemaT.Full Nothing
@@ -84,9 +84,9 @@ schemaListTest =
         liftIO $ fetchedSchemas `shouldContain` [expected]
   where schemaName = "schema-list-test"
 
-schemaPaginiatedListTest :: PubSubIO.PubSubEnv -> IO ()
+schemaPaginiatedListTest :: TestEnv -> IO ()
 schemaPaginiatedListTest =
-  runTest
+  runTestIfNotEmulator
     $ withTestSchema schema1 SchemaT.Avro sampleAvroSchema
     $ const
     $ withTestSchema schema2 SchemaT.Avro sampleAvroSchema
@@ -109,15 +109,15 @@ schemaPaginiatedListTest =
   schema1 = "schema-1-list-test"
   schema2 = "schema-2-list-test"
 
-schemaValidateTest :: PubSubIO.PubSubEnv -> IO ()
-schemaValidateTest = runTest $ do
+schemaValidateTest :: TestEnv -> IO ()
+schemaValidateTest = runTestIfNotEmulator $ do
   let schema = SchemaT.Schema schemaName SchemaT.Avro (Just sampleAvroSchema)
   result <- Schema.validate schema
   liftIO $ result `shouldBe` Nothing
   where schemaName = "valid-schema-valdiate-test"
 
-invalidSchemaValidateTest :: PubSubIO.PubSubEnv -> IO ()
-invalidSchemaValidateTest = runTest $ do
+invalidSchemaValidateTest :: TestEnv -> IO ()
+invalidSchemaValidateTest = runTestIfNotEmulator $ do
   let schema = SchemaT.Schema schemaName SchemaT.Avro (Just badSchema)
   result <- Schema.validate schema
   let expected = SchemaT.SchemaValidationError
@@ -127,9 +127,9 @@ invalidSchemaValidateTest = runTest $ do
   schemaName = "invalid-schema-valdiate-test"
   badSchema  = SchemaT.SchemaDefinition ""
 
-validateMessageTest :: PubSubIO.PubSubEnv -> IO ()
+validateMessageTest :: TestEnv -> IO ()
 validateMessageTest =
-  runTest
+  runTestIfNotEmulator
     $ withTestSchema schemaName SchemaT.Avro sampleAvroSchema
     $ \createdSchema -> do
         let validateMessageRequest = SchemaT.ValidateMessage
@@ -142,9 +142,9 @@ validateMessageTest =
         liftIO $ result `shouldBe` Nothing
   where schemaName = "valdiate-message-test"
 
-validateInvalidMessageTest :: PubSubIO.PubSubEnv -> IO ()
+validateInvalidMessageTest :: TestEnv -> IO ()
 validateInvalidMessageTest =
-  runTest
+  runTestIfNotEmulator
     $ withTestSchema schemaName SchemaT.Avro sampleAvroSchema
     $ \createdSchema -> do
         let validateMessageRequest = SchemaT.ValidateMessage

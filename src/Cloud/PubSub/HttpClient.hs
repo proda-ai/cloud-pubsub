@@ -44,6 +44,7 @@ mkRequest
   -> HttpT.PathQueryParams
   -> m Http.Request
 mkRequest method (HttpT.PathQueryParams path mayQueryParams) = do
+  baseUrl <- HttpT.askBaseUrl
   parsed  <- Http.parseRequest $ baseUrl <> path
   manager <- HttpT.askPubSubManger
   let baseReq =
@@ -51,7 +52,6 @@ mkRequest method (HttpT.PathQueryParams path mayQueryParams) = do
   return $ maybe baseReq
                  ((`Http.setQueryString` baseReq) . HttpT.unwrapQueryParams)
                  mayQueryParams
-  where baseUrl = "https://pubsub.googleapis.com"
 
 authedJsonGetRequest
   :: (HttpT.PubSubHttpClientM m, Aeson.FromJSON r)

@@ -8,7 +8,8 @@ import qualified Cloud.PubSub.Publisher.Types  as PublisherT
 import qualified Cloud.PubSub.Subscription     as Subscription
 import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
-import           Cloud.PubSub.TestHelpers       ( convertMessage
+import           Cloud.PubSub.TestHelpers       ( TestEnv(..)
+                                                , convertMessage
                                                 , mkTestPubSubEnv
                                                 , withTestSub
                                                 , withTestTopic
@@ -26,19 +27,20 @@ publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
                                              }
 
 
-runTest :: PublisherIO.PublisherIO a -> PubSubIO.PubSubEnv -> IO a
-runTest action pubSubEnv@(PubSubIO.PubSubEnv envLogger envClientResources) = do
+runTest :: PublisherIO.PublisherIO a -> TestEnv -> IO a
+runTest action (TestEnv env _) = do
   bracket acquire release $ \pubResources ->
     let publishEnv =
           PublisherIO.PublisherEnv envLogger envClientResources pubResources
     in  Reader.runReaderT (PublisherIO.runPublisherIO action) publishEnv
  where
-  publisherImpl = Publisher.mkPublisherImpl pubSubEnv
+  publisherImpl = Publisher.mkPublisherImpl env
   acquire =
     Publisher.mkPublisherResources envLogger publisherImpl publisherConfig
   release = Publisher.closePublisherResources
+  PubSubIO.PubSubEnv envLogger envClientResources = env
 
-publishMessageBatchTest :: PubSubIO.PubSubEnv -> IO ()
+publishMessageBatchTest :: TestEnv -> IO ()
 publishMessageBatchTest = runTest $ withTestTopic topic $ do
   let messageCount = 10
       messages =
@@ -49,7 +51,7 @@ publishMessageBatchTest = runTest $ withTestTopic topic $ do
   liftIO $ length ids `shouldBe` messageCount
   where topic = "publish-batch-test"
 
-publishAndConsumeTest :: PubSubIO.PubSubEnv -> IO ()
+publishAndConsumeTest :: TestEnv -> IO ()
 publishAndConsumeTest = runTest $ withTestTopic topic $ do
   let message           = CoreT.Message (Just "constant-key") "hello"
       publishedMessages = [message]

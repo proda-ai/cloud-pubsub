@@ -4,36 +4,55 @@ import           Cloud.PubSub.Core.Types        ( UpdateMask(..) )
 import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Snapshot         as Snapshot
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv
                                                 , runTest
+                                                , runTestIfNotEmulator
                                                 , withTestSnapshot
                                                 , withTestTopicAndSub
                                                 )
 import           Control.Monad.IO.Class         ( liftIO )
 import qualified Data.HashMap.Strict           as HM
 import           Test.Hspec
-import qualified Cloud.PubSub.IO               as PubSubIO
 
-snapshotManagementTest :: PubSubIO.PubSubEnv -> IO ()
-snapshotManagementTest = runTest $ withTestTopicAndSub topicName subName $ do
-  Snapshot.delete snapshotName
-  Right createdSnap <- Snapshot.createWithDefaults snapshotName subName
-  let snapshotPatch = SnapshotT.SnapshotPatch
-        { snapshot   = createdSnap
-          { SnapshotT.labels = Just $ HM.fromList [("patched", "successful")]
-          }
-        , updateMask = UpdateMask "labels"
-        }
-  updatedSnap <- Snapshot.patch snapshotName snapshotPatch
-  fetchedSnap <- Snapshot.get snapshotName
-  Snapshot.delete snapshotName
-  liftIO $ fetchedSnap `shouldBe` updatedSnap
+basicSnapshotManagementTest :: TestEnv -> IO ()
+basicSnapshotManagementTest =
+  runTest $ withTestTopicAndSub topicName subName $ do
+    Snapshot.delete snapshotName
+    Right createdSnap <- Snapshot.createWithDefaults snapshotName subName
+    fetchedSnap       <- Snapshot.get snapshotName
+    Snapshot.delete snapshotName
+    liftIO $ fetchedSnap `shouldBe` createdSnap
  where
   topicName    = "snapshot-management-test"
   subName      = "snapshot-management-test"
   snapshotName = "snapshot-management-test"
 
-duplicateSnapshotTest :: PubSubIO.PubSubEnv -> IO ()
+snapshotUpdateTest :: TestEnv -> IO ()
+snapshotUpdateTest =
+  runTestIfNotEmulator
+    $ withTestTopicAndSub topicName subName
+    $ withTestSnapshot snapshotName subName
+    $ do
+        initialSnap <- Snapshot.get snapshotName
+        let
+          snapshotPatch = SnapshotT.SnapshotPatch
+            { snapshot   = initialSnap
+              { SnapshotT.labels = Just
+                                     $ HM.fromList [("patched", "successful")]
+              }
+            , updateMask = UpdateMask "labels"
+            }
+        updatedSnap <- Snapshot.patch snapshotName snapshotPatch
+        fetchedSnap <- Snapshot.get snapshotName
+        liftIO $ fetchedSnap `shouldBe` updatedSnap
+
+ where
+  topicName    = "snapshot-update-test"
+  subName      = "snapshot-update-test"
+  snapshotName = "snapshot-update-test"
+
+duplicateSnapshotTest :: TestEnv -> IO ()
 duplicateSnapshotTest =
   runTest
     $ withTestTopicAndSub topicName subName
@@ -46,7 +65,7 @@ duplicateSnapshotTest =
   subName      = "snapshot-duplicates-test"
   snapshotName = "snapshot-duplicates-test"
 
-snapshotListTest :: PubSubIO.PubSubEnv -> IO ()
+snapshotListTest :: TestEnv -> IO ()
 snapshotListTest =
   runTest
     $ withTestTopicAndSub topicName subName
@@ -64,7 +83,7 @@ snapshotListTest =
   subName      = "snapshost-list-test"
   snapshotName = "snapshost-list-test"
 
-snapshotPaginatedListTest :: PubSubIO.PubSubEnv -> IO ()
+snapshotPaginatedListTest :: TestEnv -> IO ()
 snapshotPaginatedListTest =
   runTest
     $ withTestTopicAndSub topicName subName
@@ -91,7 +110,8 @@ snapshotPaginatedListTest =
 spec :: Spec
 spec = parallel $ before mkTestPubSubEnv $ do
   describe "Snapshot Endpoints" $ do
-    it "can create/patch/get/delete a snapshot"         snapshotManagementTest
+    it "can create/get/delete a snapshot" basicSnapshotManagementTest
+    it "can patch a snapshot" snapshotUpdateTest
     it "returns an error if the snapshot name is taken" duplicateSnapshotTest
-    it "can list snapshots"                             snapshotListTest
+    it "can list snapshots" snapshotListTest
     it "can list snapshots with pagination" snapshotPaginatedListTest

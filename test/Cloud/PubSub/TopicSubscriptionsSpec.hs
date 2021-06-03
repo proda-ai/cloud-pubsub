@@ -1,10 +1,10 @@
 module Cloud.PubSub.TopicSubscriptionsSpec where
 
 import qualified Cloud.PubSub.Http.Types       as HttpT
-import qualified Cloud.PubSub.IO               as PubSubIO
 import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv
                                                 , runTest
                                                 , withTestTopicAndSub
                                                 )
@@ -13,7 +13,7 @@ import qualified Cloud.PubSub.TopicSubscriptions
 import           Control.Monad.IO.Class         ( liftIO )
 import           Test.Hspec
 
-topicSubscriptionListTest :: PubSubIO.PubSubEnv -> IO ()
+topicSubscriptionListTest :: TestEnv -> IO ()
 topicSubscriptionListTest =
   runTest $ withTestTopicAndSub topicName subName $ do
     fetchedSubNames <-

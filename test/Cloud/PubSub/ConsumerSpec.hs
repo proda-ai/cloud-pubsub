@@ -1,8 +1,8 @@
 module Cloud.PubSub.ConsumerSpec where
 
 import qualified Cloud.PubSub.Consumer         as Consumer
-import qualified Cloud.PubSub.IO               as PubSubIO
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv
                                                 , runTest
                                                 , withTestTopicAndSub
                                                 )
@@ -11,7 +11,7 @@ import qualified Cloud.PubSub.Topic.Types      as Topic
 import           Control.Monad.IO.Class         ( liftIO )
 import           Test.Hspec
 
-publishAndConsumeTest :: PubSubIO.PubSubEnv -> IO ()
+publishAndConsumeTest :: TestEnv -> IO ()
 publishAndConsumeTest = runTest $ do
   let topicName = "polling-consumer-test"
       subName   = "test"

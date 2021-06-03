@@ -2,12 +2,13 @@ module Cloud.PubSub.SubscriptionSpec where
 
 import qualified Cloud.PubSub.Core.Types       as Core
 import qualified Cloud.PubSub.Http.Types       as HttpT
-import qualified Cloud.PubSub.IO               as PubSubIO
 import qualified Cloud.PubSub.Subscription     as Subscription
 import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv
                                                 , runTest
+                                                , runTestIfNotEmulator
                                                 , withTestSub
                                                 , withTestTopic
                                                 , withTestTopicAndSub
@@ -26,35 +27,50 @@ testMessage = Topic.PublishPubsubMessage { ppmOrderingKey = Just "constant-key"
                                          , ppmData        = "some data"
                                          }
 
-subscriptionManagementTest :: PubSubIO.PubSubEnv -> IO ()
-subscriptionManagementTest = runTest $ withTestTopic topicName $ do
+resetPublishConfigAttributes
+  :: SubscriptionT.Subscription -> SubscriptionT.Subscription
+resetPublishConfigAttributes sub = sub
+  { SubscriptionT.pushConfig = Just pushConfig
+  }
+ where
+  pushConfig =
+    (fromJust $ SubscriptionT.pushConfig (sub :: SubscriptionT.Subscription))
+      { SubscriptionT.attributes = Nothing
+      }
+
+basicSubscriptionManagementTest :: TestEnv -> IO ()
+basicSubscriptionManagementTest = runTest $ withTestTopic topicName $ do
   Subscription.delete subName
   Right createdSub <- Subscription.createWithDefaults subName topicName
-  let subPatch = SubscriptionT.SubscriptionPatch
-        { subscription = createdSub
-          { SubscriptionT.labels = Just
-                                     $ HM.fromList [("patched", "successful")]
-          }
-        , updateMask   = Core.UpdateMask "labels"
-        }
-  updatedSub <- Subscription.patch subName subPatch
-  fetchedSub <- Subscription.get subName
+  fetchedSub       <- Subscription.get subName
   Subscription.delete subName
-  let
-    pushConfig =
-      ( fromJust
-        $ SubscriptionT.pushConfig (updatedSub :: SubscriptionT.Subscription)
-        )
-        { SubscriptionT.attributes = Nothing
-        }
-    expected :: SubscriptionT.Subscription
-    expected = updatedSub { SubscriptionT.pushConfig = Just pushConfig }
+  let expected = resetPublishConfigAttributes createdSub
   liftIO $ fetchedSub `shouldBe` expected
  where
   topicName = "subscription-management-test"
   subName   = "subscription-management-test"
 
-duplicateSubscriptionTest :: PubSubIO.PubSubEnv -> IO ()
+subscriptionUpdateTest :: TestEnv -> IO ()
+subscriptionUpdateTest =
+  runTestIfNotEmulator $ withTestTopicAndSub topicName subName $ do
+    initialSub <- Subscription.get subName
+    let
+      subPatch = SubscriptionT.SubscriptionPatch
+        { subscription = initialSub
+          { SubscriptionT.labels = Just
+                                     $ HM.fromList [("patched", "successful")]
+          }
+        , updateMask   = Core.UpdateMask "labels"
+        }
+    updatedSub <- Subscription.patch subName subPatch
+    let expected = resetPublishConfigAttributes updatedSub
+    fetchedSub <- Subscription.get subName
+    liftIO $ fetchedSub `shouldBe` expected
+ where
+  topicName = "subscription-update-test"
+  subName   = "subscription-update-test"
+
+duplicateSubscriptionTest :: TestEnv -> IO ()
 duplicateSubscriptionTest =
   runTest $ withTestTopicAndSub topicName subName $ do
     result <- Subscription.createWithDefaults subName topicName
@@ -63,7 +79,7 @@ duplicateSubscriptionTest =
   topicName = "subscription-duplicates-test"
   subName   = "subscription-duplicates-test"
 
-subscriptionListTest :: PubSubIO.PubSubEnv -> IO ()
+subscriptionListTest :: TestEnv -> IO ()
 subscriptionListTest = runTest $ withTestTopicAndSub topicName subName $ do
   fetchedSubs <- Subscription.list Nothing
   projectId   <- HttpT.askProjectId
@@ -75,7 +91,7 @@ subscriptionListTest = runTest $ withTestTopicAndSub topicName subName $ do
   topicName = "subscription-list-test"
   subName   = "subscription-list-test"
 
-subscriptionPaginatedListTest :: PubSubIO.PubSubEnv -> IO ()
+subscriptionPaginatedListTest :: TestEnv -> IO ()
 subscriptionPaginatedListTest =
   runTest
     $ withTestTopic topic
@@ -102,7 +118,7 @@ subscriptionPaginatedListTest =
   sub1  = "subscription-1-list-test"
   sub2  = "subscription-2-list-test"
 
-pullSubscriptionTest :: PubSubIO.PubSubEnv -> IO ()
+pullSubscriptionTest :: TestEnv -> IO ()
 pullSubscriptionTest = runTest $ withTestTopicAndSub topicName subName $ do
   _        <- Topic.publish topicName [testMessage]
   messages <- Subscription.pull subName 1
@@ -113,7 +129,7 @@ pullSubscriptionTest = runTest $ withTestTopicAndSub topicName subName $ do
   topicName = "subscription-pull-test"
   subName   = "subscription-pull-test"
 
-seekSubscriptionTest :: PubSubIO.PubSubEnv -> IO ()
+seekSubscriptionTest :: TestEnv -> IO ()
 seekSubscriptionTest = runTest $ withTestTopicAndSub topicName subName $ do
   _   <- Topic.publish topicName [testMessage]
   now <- liftIO Time.getCurrentTime
@@ -123,7 +139,7 @@ seekSubscriptionTest = runTest $ withTestTopicAndSub topicName subName $ do
   topicName = "subscription-seek-test"
   subName   = "subscription-seek-test"
 
-modifyAckSubscriptionTest :: PubSubIO.PubSubEnv -> IO ()
+modifyAckSubscriptionTest :: TestEnv -> IO ()
 modifyAckSubscriptionTest =
   runTest $ withTestTopicAndSub topicName subName $ do
     _        <- Topic.publish topicName [testMessage]
@@ -135,7 +151,7 @@ modifyAckSubscriptionTest =
   topicName = "subscription-modify-ack-test"
   subName   = "subscription-modify-ack-test"
 
-detachSubscriptionTest :: PubSubIO.PubSubEnv -> IO ()
+detachSubscriptionTest :: TestEnv -> IO ()
 detachSubscriptionTest = runTest $ withTestTopicAndSub topicName subName $ do
   Subscription.detach subName
  where
@@ -145,7 +161,8 @@ detachSubscriptionTest = runTest $ withTestTopicAndSub topicName subName $ do
 spec :: Spec
 spec = parallel $ before mkTestPubSubEnv $ do
   describe "Subscription Endpoints" $ do
-    it "can create/patch/get/delete a subscription" subscriptionManagementTest
+    it "can create/get/delete a subscription" basicSubscriptionManagementTest
+    it "can patch a subscription"             subscriptionUpdateTest
     it "returns an error if the subscription name is taken"
        duplicateSubscriptionTest
     it "can list subscriptions"                 subscriptionListTest

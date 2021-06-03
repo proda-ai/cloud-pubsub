@@ -2,9 +2,10 @@ module Cloud.PubSub.TopicSpec where
 
 import qualified Cloud.PubSub.Core.Types       as Core
 import qualified Cloud.PubSub.Http.Types       as HttpT
-import qualified Cloud.PubSub.IO               as PubSubIO
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv
                                                 , runTest
+                                                , runTestIfNotEmulator
                                                 , withTestTopic
                                                 )
 import qualified Cloud.PubSub.Topic            as Topic
@@ -14,29 +15,36 @@ import           Data.Functor                   ( void )
 import qualified Data.HashMap.Strict           as HM
 import           Test.Hspec
 
-topicManagementTest :: PubSubIO.PubSubEnv -> IO ()
-topicManagementTest = runTest $ do
+basicTopicManagementTest :: TestEnv -> IO ()
+basicTopicManagementTest = runTest $ do
   Topic.delete topic
   Right createdTopic <- Topic.createWithDefaults topic
+  fetchedTopic       <- Topic.get topic
+  Topic.delete topic
+  liftIO $ createdTopic `shouldBe` fetchedTopic
+  where topic = "topic-management-test"
+
+topicUpdateTest :: TestEnv -> IO ()
+topicUpdateTest = runTestIfNotEmulator $ withTestTopic topic $ do
+  initialTopic <- Topic.get topic
   let topicPatch = TopicT.TopicPatch
-        { topic      = createdTopic
+        { topic      = initialTopic
           { TopicT.labels = Just $ HM.fromList [("patched", "successful")]
           }
         , updateMask = Core.UpdateMask "labels"
         }
   updatedTopic <- Topic.patch topic topicPatch
   fetchedTopic <- Topic.get topic
-  Topic.delete topic
   liftIO $ updatedTopic `shouldBe` fetchedTopic
-  where topic = "topic-management-test"
+  where topic = "topic-update-test"
 
-duplicateTopicTest :: PubSubIO.PubSubEnv -> IO ()
+duplicateTopicTest :: TestEnv -> IO ()
 duplicateTopicTest = runTest $ withTestTopic topic $ do
   result <- Topic.createWithDefaults topic
   liftIO $ result `shouldBe` Left TopicT.TopicAlreadyExists
   where topic = "topic-duplicates-test"
 
-topicPublishTest :: PubSubIO.PubSubEnv -> IO ()
+topicPublishTest :: TestEnv -> IO ()
 topicPublishTest = runTest $ withTestTopic topic $ do
   void $ Topic.publish topic [message]
  where
@@ -45,7 +53,7 @@ topicPublishTest = runTest $ withTestTopic topic $ do
                                         , ppmData        = "some data"
                                         }
 
-topicListTest :: PubSubIO.PubSubEnv -> IO ()
+topicListTest :: TestEnv -> IO ()
 topicListTest = runTest $ withTestTopic topic $ do
   fetchedTopics <- Topic.list Nothing
   projectId     <- HttpT.askProjectId
@@ -54,7 +62,7 @@ topicListTest = runTest $ withTestTopic topic $ do
   liftIO $ fetchedTopicNames `shouldContain` [qualify topic]
   where topic = "topic-list-test"
 
-topicPaginiatedListTest :: PubSubIO.PubSubEnv -> IO ()
+topicPaginiatedListTest :: TestEnv -> IO ()
 topicPaginiatedListTest =
   runTest $ withTestTopic topic1 $ withTestTopic topic2 $ do
     fetchedTopics1 <- Topic.list $ Just $ HttpT.PageQuery 1 Nothing
@@ -73,7 +81,8 @@ topicPaginiatedListTest =
 spec :: Spec
 spec = parallel $ before mkTestPubSubEnv $ do
   describe "Topic Endpoints" $ do
-    it "can create/patch/get/delete a topic"         topicManagementTest
+    it "can create/get/delete a topic"               basicTopicManagementTest
+    it "can patch a topic"                           topicUpdateTest
     it "returns an error if the topic name is taken" duplicateTopicTest
     it "can publish to a topic"                      topicPublishTest
     it "can list topics"                             topicListTest

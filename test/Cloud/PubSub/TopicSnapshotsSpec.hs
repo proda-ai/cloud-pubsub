@@ -1,9 +1,9 @@
 module Cloud.PubSub.TopicSnapshotsSpec where
 
 import qualified Cloud.PubSub.Http.Types       as HttpT
-import qualified Cloud.PubSub.IO               as PubSubIO
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
-import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv
+import           Cloud.PubSub.TestHelpers       ( TestEnv
+                                                , mkTestPubSubEnv
                                                 , runTest
                                                 , withTestSnapshot
                                                 , withTestTopicAndSub
@@ -12,7 +12,7 @@ import qualified Cloud.PubSub.TopicSnapshots   as TopicSnapshots
 import           Control.Monad.IO.Class         ( liftIO )
 import           Test.Hspec
 
-topicSubscriptionListTest :: PubSubIO.PubSubEnv -> IO ()
+topicSubscriptionListTest :: TestEnv -> IO ()
 topicSubscriptionListTest =
   runTest
     $ withTestTopicAndSub topicName subName

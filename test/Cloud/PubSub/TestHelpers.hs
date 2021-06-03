@@ -22,7 +22,14 @@ import           Control.Monad.Catch            ( Exception
                                                 )
 import qualified Data.HashMap.Strict           as HM
 import           Data.Text                      ( Text )
+import qualified System.Environment            as SystemEnv
 import qualified System.IO                     as SystemIO
+import           Test.Hspec                     ( pendingWith )
+
+data TestEnv = TestEnv
+  { pubSubEnv  :: PubSubIO.PubSubEnv
+  , isEmulated :: Bool
+  }
 
 -- This logger may inadvertently cause behaviour to change the mutex
 -- may cause non-logging actions to synchronise through monadic
@@ -40,11 +47,14 @@ createTestLogger = do
 testServiceAccountPath :: FilePath
 testServiceAccountPath = "./secrets/service_account.json"
 
-apiConfig :: PubSub.GoogleApiConfig
-apiConfig = PubSub.GoogleApiConfig
-  { authMethod          = PubSub.ServiceAccountFile testServiceAccountPath
-  , tokenRenewThreshold = 60 -- secs
-  }
+getApiConfig :: IO PubSub.GoogleApiConfig
+getApiConfig = do
+  maybeUrl <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST"
+  return $ PubSub.GoogleApiConfig
+    { authMethod          = PubSub.ServiceAccountFile testServiceAccountPath
+    , baseUrl             = maybeUrl
+    , tokenRenewThreshold = 60 -- secs
+    }
 
 testLabels :: HM.HashMap Text Text
 testLabels = HM.fromList [("environment", "test")]
@@ -134,11 +144,24 @@ convertMessage m = Message
   , value = Core.unwrapBase64DataString (SubscriptionT.pmData m)
   }
 
-runTest :: PubSubIO.PubSubIO a -> PubSubIO.PubSubEnv -> IO a
-runTest = flip PubSubIO.runPubSubIOToIO
+runTest :: PubSubIO.PubSubIO a -> TestEnv -> IO a
+runTest action env = PubSubIO.runPubSubIOToIO (pubSubEnv env) action
 
-mkTestPubSubEnv :: IO PubSubIO.PubSubEnv
-mkTestPubSubEnv = createTestLogger >>= PubSub.mkPubSubEnv apiConfig
+runTestIfNotEmulator :: PubSubIO.PubSubIO () -> TestEnv -> IO ()
+runTestIfNotEmulator action env = do
+  if isEmulated env
+    then pendingWith "skipping as action not supported in emulator"
+    else PubSubIO.runPubSubIOToIO (pubSubEnv env) action
+
+mkTestPubSubEnv :: IO TestEnv
+mkTestPubSubEnv = do
+  apiConfig <- getApiConfig
+  logger    <- createTestLogger
+  env       <- PubSub.mkPubSubEnv apiConfig logger
+  let emulated = maybe False
+                       (/=  "https://pubsub.googleapis.com")
+                       (PubSub.baseUrl apiConfig)
+  return $ TestEnv env emulated
 
 data ExpectedError = ExpectedError
   deriving stock (Show, Eq)
