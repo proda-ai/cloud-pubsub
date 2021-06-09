@@ -8,7 +8,6 @@ import qualified Cloud.PubSub.Logger           as Logger
 import           Control.Concurrent.MVar        ( MVar )
 import           Control.Monad.Catch            ( Exception
                                                 , MonadThrow
-                                                , throwM
                                                 )
 import           Control.Monad.IO.Class         ( MonadIO )
 import qualified Data.Aeson                    as Aeson
@@ -94,11 +93,6 @@ data RequestError = ResponseError ErrorMessage
                     deriving stock (Show, Eq)
 
 instance Exception RequestError
-
-getOrThrow :: MonadThrow m => Either RequestError r -> m r
-getOrThrow result = case result of
-  Right r -> return r
-  Left  e -> throwM e
 
 newtype PageToken = PageToken
   { unwrapPageToken :: Text

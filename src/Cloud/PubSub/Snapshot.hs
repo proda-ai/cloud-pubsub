@@ -72,7 +72,7 @@ patch
   -> m SnapshotT.Snapshot
 patch subName subPatch = do
   path <- getSnapshotPath subName
-  HttpClient.authedJsonPatchRequest path subPatch >>= HttpT.getOrThrow
+  HttpClient.authedJsonPatchRequest path subPatch >>= either throwM return
 
 list
   :: HttpT.PubSubHttpClientM m

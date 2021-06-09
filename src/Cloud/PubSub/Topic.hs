@@ -81,7 +81,7 @@ patch
   -> m TopicT.Topic
 patch topicName topicPatch = do
   path <- getTopicPath topicName
-  HttpClient.authedJsonPatchRequest path topicPatch >>= HttpT.getOrThrow
+  HttpClient.authedJsonPatchRequest path topicPatch >>= either throwM return
 
 delete :: HttpT.PubSubHttpClientM m => TopicName -> m ()
 delete topicName = do
@@ -96,5 +96,5 @@ publish
 publish topicName messages = do
   path <- getTopicOpPath topicName ":publish"
   TopicT.messageIds
-    <$> (HttpClient.authedJsonPostRequest path body >>= HttpT.getOrThrow)
+    <$> (HttpClient.authedJsonPostRequest path body >>= either throwM return)
   where body = TopicT.PubsubMessageBatch messages

@@ -96,7 +96,7 @@ patch
   -> m SubscriptionT.Subscription
 patch subName subPatch = do
   path <- getSubPath subName
-  HttpClient.authedJsonPatchRequest path subPatch >>= HttpT.getOrThrow
+  HttpClient.authedJsonPatchRequest path subPatch >>= either throwM return
 
 pull
   :: HttpT.PubSubHttpClientM m
@@ -107,7 +107,7 @@ pull subName batchSize = do
   path <- getSubOpPath subName ":pull"
   let body = SubscriptionT.PullRequest batchSize
   SubscriptionT.receivedMessages
-    <$> (HttpClient.authedJsonPostRequest path body >>= HttpT.getOrThrow)
+    <$> (HttpClient.authedJsonPostRequest path body >>= either throwM return)
 
 acknowledge
   :: HttpT.PubSubHttpClientM m
