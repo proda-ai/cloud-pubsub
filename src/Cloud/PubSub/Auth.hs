@@ -55,20 +55,18 @@ fetchToken manager serviceAccount scope = liftIO $ do
   -- implements the flow described here, 
   -- https://developers.google.com/identity/protocols/oauth2/service-account
   now <- Time.getCurrentTime
-  let
-    oneHour = 3600
-    email   = AuthT.saClientEmail serviceAccount
-    claims  = AuthT.TokenClaims
-      { issuedAt = AuthT.UnixEpochSeconds now
-      , expiryAt = AuthT.UnixEpochSeconds $ Time.addUTCTime oneHour now
-      , audience = Text.pack googleTokenUrl
-      , issuer   = email
-      , subject  = email
-      , scope    = scope
-      }
-    keyId = AuthT.saPrivateKeyId serviceAccount
-    key =
-      AuthT.unwrapServiceAccountPrivateKey $ AuthT.saPrivateKey serviceAccount
+  let oneHour = 3600
+      email   = AuthT.saClientEmail serviceAccount
+      claims  = AuthT.TokenClaims
+        { issuedAt = AuthT.UnixEpochSeconds now
+        , expiryAt = AuthT.UnixEpochSeconds $ Time.addUTCTime oneHour now
+        , audience = Text.pack googleTokenUrl
+        , issuer   = email
+        , subject  = email
+        , scope    = scope
+        }
+      keyId = AuthT.saPrivateKeyId serviceAccount
+      key   = AuthT.unwrapX509PrivateKey $ AuthT.saPrivateKey serviceAccount
   token   <- createAssertionToken key keyId claims
   request <-
     HTTP.parseRequest ("POST " <> googleTokenUrl)

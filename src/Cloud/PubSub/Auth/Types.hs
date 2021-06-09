@@ -23,7 +23,7 @@ newtype Scope = Scope {unwrapScope :: Text}
   deriving stock (Show)
   deriving newtype (Aeson.ToJSON, IsString, Aeson.FromJSON)
 
-newtype X509PrivateKey = X509PrivateKey { unwrapServiceAccountPrivateKey :: PrivateKey }
+newtype X509PrivateKey = X509PrivateKey { unwrapX509PrivateKey :: PrivateKey }
 
 instance Aeson.FromJSON X509PrivateKey where
   parseJSON = Aeson.withText "X509PrivateKey" $ \text -> do
