@@ -1,9 +1,9 @@
 name: cloud-pubsub
 version: 0.1.0.0
 license: BSD3
-author: "PRODA AI"
+author: "PRODA LTD"
 maintainer: "engineering@proda.ai"
-copyright: "2021 PRODA AI"
+copyright: "2021 PRODA LTD"
 
 extra-source-files:
   - README.md

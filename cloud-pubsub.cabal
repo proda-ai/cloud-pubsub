@@ -7,9 +7,9 @@ cabal-version: 1.12
 name:           cloud-pubsub
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/proda-ai/cloud-pubsub#readme>
-author:         PRODA AI
+author:         PRODA LTD
 maintainer:     engineering@proda.ai
-copyright:      2021 PRODA AI
+copyright:      2021 PRODA LTD
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
