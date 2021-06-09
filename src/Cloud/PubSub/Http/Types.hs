@@ -77,11 +77,11 @@ data ErrorMessage = ErrorMessage
   deriving stock (Show, Eq, Generic)
   deriving anyclass Aeson.FromJSON
 
-alreadyExists :: ErrorMessage -> Bool
-alreadyExists = (==) "ALREADY_EXISTS" . status
+isAlreadyExistsError :: ErrorMessage -> Bool
+isAlreadyExistsError = (==) "ALREADY_EXISTS" . status
 
-invalidArgument :: ErrorMessage -> Bool
-invalidArgument = (==) "INVALID_ARGUMENT" . status
+isInvalidArgumentError :: ErrorMessage -> Bool
+isInvalidArgumentError = (==) "INVALID_ARGUMENT" . status
 
 newtype ErrorRepsonse = ErrorRepsonse
   { error :: ErrorMessage

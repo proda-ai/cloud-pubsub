@@ -38,7 +38,7 @@ create snapshotName snapshot = do
   path <- getSnapshotPath snapshotName
   HttpClient.authedJsonPutRequest path snapshot >>= \case
     Right r                         -> return $ Right r
-    Left  e@(HttpT.ResponseError m) -> if HttpT.alreadyExists m
+    Left  e@(HttpT.ResponseError m) -> if HttpT.isAlreadyExistsError m
       then return $ Left SnapshotT.SnapshotAlreadyExists
       else throwM e
     Left e -> throwM e
