@@ -45,7 +45,15 @@ runEvery interval action = forever $ do
       timeTill = round (1000000 * toDouble interval) - elapsed
   liftIO $ Concurrent.threadDelay timeTill
 
--- Still WIP
+-- This fetches messages from subscription periodically, processes the messages
+-- sequentially and acknowldeges the messages as processed.
+-- Potential improvements 
+-- * Mechanism to retry messages that could not be processed with a user 
+-- provided strategy
+-- * Provide a way to spawn a woerker running the process loop and provide
+-- a way to terminate it
+-- * Given that pubsub only gurantees ordered delivery of messages for each key
+-- we have a variant that processes messages in parallel
 processMessages
   :: PubSubHttpClientM m
   => ConsumerConfig
