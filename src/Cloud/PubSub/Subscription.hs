@@ -41,7 +41,8 @@ getSubOpPath
   => SubscriptionT.SubName
   -> String
   -> m HttpT.PathQueryParams
-getSubOpPath subName op = HttpT.simplePath . flip (++) op <$> getSubStr subName
+getSubOpPath subName op =
+  HttpT.simplePath . (++ (':' : op)) <$> getSubStr subName
 
 create
   :: HttpT.PubSubHttpClientM m
@@ -104,7 +105,7 @@ pull
   -> Int
   -> m [SubscriptionT.ReceivedMessage]
 pull subName batchSize = do
-  path <- getSubOpPath subName ":pull"
+  path <- getSubOpPath subName "pull"
   let body = SubscriptionT.PullRequest batchSize
   SubscriptionT.receivedMessages
     <$> (HttpClient.authedJsonPostRequest path body >>= either throwM return)
@@ -115,7 +116,7 @@ acknowledge
   -> [SubscriptionT.AckId]
   -> m ()
 acknowledge subName ackIds = do
-  path <- getSubOpPath subName ":acknowledge"
+  path <- getSubOpPath subName "acknowledge"
   let body = SubscriptionT.AcknowledgeRequest ackIds
   HttpClient.authedNoContentPostRequest path body
 
@@ -126,7 +127,7 @@ modifyAckDeadline
   -> Int
   -> m ()
 modifyAckDeadline subName ackIds deadlineSecs = do
-  path <- getSubOpPath subName ":modifyAckDeadline"
+  path <- getSubOpPath subName "modifyAckDeadline"
   let body = SubscriptionT.ModifyAckDeadlineRequest ackIds deadlineSecs
   HttpClient.authedNoContentPostRequest path body
 
@@ -136,13 +137,13 @@ modifyPushConfig
   -> SubscriptionT.PushConfig
   -> m ()
 modifyPushConfig subName pushConfig = do
-  path <- getSubOpPath subName ":modifyPushConfig"
+  path <- getSubOpPath subName "modifyPushConfig"
   let body = SubscriptionT.ModifyPushConfigRequest pushConfig
   HttpClient.authedNoContentPostRequest path body
 
 detach :: HttpT.PubSubHttpClientM m => SubscriptionT.SubName -> m ()
 detach subName = do
-  path <- getSubOpPath subName ":detach"
+  path <- getSubOpPath subName "detach"
   HttpClient.authedNoBodyPostRequest path
 
 seek
@@ -151,7 +152,7 @@ seek
   -> SubscriptionT.SeekTarget
   -> m ()
 seek subName target = do
-  path <- getSubOpPath subName ":seek"
+  path <- getSubOpPath subName "seek"
   HttpClient.authedNoContentPostRequest path target
 
 list

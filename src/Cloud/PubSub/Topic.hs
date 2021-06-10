@@ -36,7 +36,7 @@ getTopicOpPath
   -> String
   -> m HttpT.PathQueryParams
 getTopicOpPath topicName op =
-  HttpT.simplePath . flip (++) op <$> getTopicStr topicName
+  HttpT.simplePath . (++ (':' : op)) <$> getTopicStr topicName
 
 create
   :: HttpT.PubSubHttpClientM m
@@ -94,7 +94,7 @@ publish
   -> [TopicT.PublishPubsubMessage]
   -> m [MessageId]
 publish topicName messages = do
-  path <- getTopicOpPath topicName ":publish"
+  path <- getTopicOpPath topicName "publish"
   TopicT.messageIds
     <$> (HttpClient.authedJsonPostRequest path body >>= either throwM return)
   where body = TopicT.PubsubMessageBatch messages

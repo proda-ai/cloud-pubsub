@@ -40,7 +40,7 @@ getSchemasOpPath op = do
     $  HttpT.simplePath
     $  "/v1/projects/"
     <> Text.unpack projectId
-    <> "/schemas"
+    <> "/schemas:"
     <> op
 
 create
@@ -113,7 +113,7 @@ validate
   => SchemaT.Schema
   -> m (Maybe SchemaT.SchemaValidationError)
 validate schema = do
-  path <- getSchemasOpPath ":validate"
+  path <- getSchemasOpPath "validate"
   HttpClient.authedJsonPostRequest path body >>= \case
     Right v -> if v == emptyObject
       then return Nothing
@@ -129,7 +129,7 @@ validateMessage
   => SchemaT.ValidateMessage
   -> m (Maybe SchemaT.SchemaValidationError)
 validateMessage vm = do
-  path <- getSchemasOpPath ":validateMessage"
+  path <- getSchemasOpPath "validateMessage"
   HttpClient.authedJsonPostRequest path vm >>= \case
     Right v -> if v == emptyObject
       then return Nothing
