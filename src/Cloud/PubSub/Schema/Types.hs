@@ -1,4 +1,18 @@
-module Cloud.PubSub.Schema.Types where
+module Cloud.PubSub.Schema.Types
+  ( SchemaName(..)
+  , QualifiedSchemaName
+  , Schema(..)
+  , SchemaType(..)
+  , SchemaDefinition(..)
+  , SchemaView(..)
+  , CreatedSchema(..)
+  , SchemaListResponse(..)
+  , SchemaAlreadyExists(..)
+  , SchemaValidationError(..)
+  , ValidateSchema(..)
+  , ValidateMessage(..)
+  , qualifySchemaName
+  ) where
 
 import qualified Cloud.PubSub.Core.Json        as Json
 import           Cloud.PubSub.Core.Types        ( Base64DataString

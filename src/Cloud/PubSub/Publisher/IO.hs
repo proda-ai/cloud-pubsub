@@ -1,4 +1,7 @@
-module Cloud.PubSub.Publisher.IO where
+module Cloud.PubSub.Publisher.IO
+  ( PublisherEnv(..)
+  , PublisherIO(..)
+  ) where
 
 import qualified Cloud.PubSub.Auth.Token       as AuthToken
 import qualified Cloud.PubSub.Auth.Types       as AuthT

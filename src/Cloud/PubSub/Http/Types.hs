@@ -1,6 +1,24 @@
 {-# LANGUAGE ConstraintKinds #-}
 
-module Cloud.PubSub.Http.Types where
+module Cloud.PubSub.Http.Types
+  ( TokenContainer(..)
+  , ClientResources(..)
+  , QueryParams(..)
+  , HasPubSubHttpManager(..)
+  , HasGoogleProjectId(..)
+  , HasClientResources(..)
+  , PathQueryParams(..)
+  , PageToken
+  , PageQuery(..)
+  , PubSubHttpClientM
+  , RequestError(..)
+  , ErrorMessage(..)
+  , ErrorRepsonse(..)
+  , pageQueryParams
+  , isAlreadyExistsError
+  , isInvalidArgumentError
+  , simplePath
+  ) where
 
 import qualified Cloud.PubSub.Auth.Types       as AuthT
 import           Cloud.PubSub.Core.Types        ( ProjectId )

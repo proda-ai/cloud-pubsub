@@ -1,4 +1,18 @@
-module Cloud.PubSub.Publisher.Types where
+module Cloud.PubSub.Publisher.Types
+  ( BatchCapacity(..)
+  , BatchId
+  , HasPublisherResources(..)
+  , PendingMessageBatch(..)
+  , PublishResult(..)
+  , PublisherConfig(..)
+  , PublisherImpl(..)
+  , PublisherResources(..)
+  , MessageBatchSizeExceeded(..)
+  , SentStatus(..)
+  , genBatchId
+  , pendingMessageBatchSize
+  , publishResultCtx
+  ) where
 
 
 import           Cloud.PubSub.Core.Types        ( Message

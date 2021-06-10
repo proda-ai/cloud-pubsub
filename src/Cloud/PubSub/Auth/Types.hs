@@ -1,4 +1,15 @@
-module Cloud.PubSub.Auth.Types where
+module Cloud.PubSub.Auth.Types
+  ( AccessToken(..)
+  , AccessTokenResponse(..)
+  , CachedToken(..)
+  , GoogleApiAuth(..)
+  , PrivateKeyId(..)
+  , Scope(..)
+  , ServiceAccount(..)
+  , TokenClaims(..)
+  , UnixEpochSeconds(..)
+  , X509PrivateKey(..)
+  ) where
 
 import           Cloud.PubSub.Core.Types        ( ProjectId )
 import           Crypto.PubKey.RSA.Types        ( PrivateKey )

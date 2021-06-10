@@ -1,4 +1,13 @@
-module Cloud.PubSub.Core.Types where
+module Cloud.PubSub.Core.Types(
+  Base64DataString(..),
+  Message(..), 
+  MessageId(..),
+  ProjectId(..),
+  TopicName(..),
+  QualifiedTopicName(..),
+  UpdateMask(..),
+  qualifyTopicName,
+) where
 
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString                ( ByteString )

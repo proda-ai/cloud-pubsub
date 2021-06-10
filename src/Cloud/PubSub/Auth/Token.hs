@@ -1,4 +1,6 @@
-module Cloud.PubSub.Auth.Token where
+module Cloud.PubSub.Auth.Token
+  ( getToken
+  ) where
 
 import qualified Cloud.PubSub.Auth             as Auth
 import qualified Cloud.PubSub.Auth.Types       as Auth
