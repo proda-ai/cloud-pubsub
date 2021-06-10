@@ -17,7 +17,7 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
 import           Data.Time                      ( NominalDiffTime )
-import qualified Data.Time.Clock.POSIX         as POSIXTime
+import qualified System.Clock                  as Clock
 
 data ConsumerConfig = ConsumerConfig
   { pollBatchSize   :: Int
@@ -27,9 +27,14 @@ data ConsumerConfig = ConsumerConfig
 toDouble :: Real a => a -> Double
 toDouble = realToFrac
 
--- The epochMicros function isn't monotonic
 epochMicros :: MonadIO m => m Int
-epochMicros = round . (* 1000000) . toDouble <$> liftIO POSIXTime.getPOSIXTime
+epochMicros =
+  liftIO
+    $   round
+    .   (/ 1000)
+    .   (fromIntegral :: Integer -> Double)
+    .   Clock.toNanoSecs
+    <$> Clock.getTime Clock.Monotonic
 
 runEvery :: MonadIO m => NominalDiffTime -> m () -> m ()
 runEvery interval action = forever $ do

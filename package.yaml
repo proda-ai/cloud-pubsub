@@ -36,6 +36,7 @@ library:
   source-dirs: src
   dependencies:
     - aeson
+    - clock
     - base64-bytestring
     - bytestring
     - cryptonite
