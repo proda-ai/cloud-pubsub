@@ -29,3 +29,6 @@ jobs:
           GCP_SA_KEY: ${{secrets.GCP_SA_KEY}}
       - name: Run Tests
         run: stack test
+        env:
+          PROJECT_ID: ${{secrets.PROJECT_ID}}
+          GOOGLE_APPLICATION_CREDENTIALS: ./secrets/service_account.json

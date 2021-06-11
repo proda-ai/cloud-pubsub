@@ -22,14 +22,20 @@ import           Control.Monad.Catch            ( Exception
                                                 )
 import qualified Data.HashMap.Strict           as HM
 import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
 import qualified System.Environment            as SystemEnv
 import qualified System.IO                     as SystemIO
 import           Test.Hspec                     ( pendingWith )
 
-data TestEnv = TestEnv
+newtype TestEnv = TestEnv
   { pubSubEnv  :: PubSubIO.PubSubEnv
-  , isEmulated :: Bool
   }
+
+isEmulated :: TestEnv -> Bool
+isEmulated (TestEnv (PubSubIO.PubSubEnv _ cr)) =
+  case HttpT.crTargetResorces cr of
+    HttpT.Emulator -> True
+    HttpT.Cloud _  -> False
 
 -- This logger may inadvertently cause behaviour to change the mutex
 -- may cause non-logging actions to synchronise through monadic
@@ -46,15 +52,6 @@ createTestLogger = do
 
 testServiceAccountPath :: FilePath
 testServiceAccountPath = "./secrets/service_account.json"
-
-getApiConfig :: IO PubSub.GoogleApiConfig
-getApiConfig = do
-  maybeUrl <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST"
-  return $ PubSub.GoogleApiConfig
-    { authMethod          = PubSub.ServiceAccountFile testServiceAccountPath
-    , baseUrl             = maybeUrl
-    , tokenRenewThreshold = 60 -- secs
-    }
 
 testLabels :: HM.HashMap Text Text
 testLabels = HM.fromList [("environment", "test")]
@@ -155,13 +152,15 @@ runTestIfNotEmulator action env = do
 
 mkTestPubSubEnv :: IO TestEnv
 mkTestPubSubEnv = do
-  apiConfig <- getApiConfig
-  logger    <- createTestLogger
-  env       <- PubSub.mkPubSubEnv apiConfig logger
-  let emulated = maybe False
-                       (/=  "https://pubsub.googleapis.com")
-                       (PubSub.baseUrl apiConfig)
-  return $ TestEnv env emulated
+  projectId <- Core.ProjectId . Text.pack <$> SystemEnv.getEnv "PROJECT_ID"
+  target    <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST" >>= \case
+    Just hostPort -> return $ PubSub.EmulatorTarget $ PubSub.HostPort hostPort
+    Nothing       -> do
+      saFile <- SystemEnv.getEnv "GOOGLE_APPLICATION_CREDENTIALS"
+      let authMethod = PubSub.ServiceAccountFile saFile
+      return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig 60 authMethod
+  logger <- createTestLogger
+  TestEnv <$> PubSub.mkPubSubEnv projectId target logger
 
 data ExpectedError = ExpectedError
   deriving stock (Show, Eq)

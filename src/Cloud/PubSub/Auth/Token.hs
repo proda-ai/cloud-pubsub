@@ -12,12 +12,15 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
 import qualified Data.Time                     as Time
+import qualified Network.HTTP.Client           as HttpClient
 
 fetchAndUpdateToken
-  :: HttpT.ClientResources -> Auth.Scope -> IO Auth.AccessToken
-fetchAndUpdateToken resources scope = do
-  let serviceAccount = HttpT.crServiceAccount resources
-      manager        = HttpT.crManager resources
+  :: HttpT.CloudTargetResources
+  -> HttpClient.Manager
+  -> Auth.Scope
+  -> IO Auth.AccessToken
+fetchAndUpdateToken resources manager scope = do
+  let serviceAccount = HttpT.ctrServiceAccount resources
   tokenResponse <- Auth.fetchToken manager serviceAccount scope
   now           <- Time.getCurrentTime
   let accessToken =
@@ -25,36 +28,45 @@ fetchAndUpdateToken resources scope = do
       expiresIn   = Auth.expiresIn (tokenResponse :: Auth.AccessTokenResponse)
       expiresAt   = Time.addUTCTime expiresIn now
       cachedToken = Auth.CachedToken accessToken expiresAt
-  MVar.putMVar (HttpT.crCachedTokenMVar resources) (HttpT.Available cachedToken)
+  MVar.putMVar (HttpT.ctrCachedTokenMVar resources)
+               (HttpT.Available cachedToken)
   return accessToken
 
 fetchAndUpdateTokenOrReset
-  :: MonadIO m => HttpT.ClientResources -> Auth.Scope -> m Auth.AccessToken
-fetchAndUpdateTokenOrReset resources scope =
+  :: MonadIO m
+  => HttpT.CloudTargetResources
+  -> HttpClient.Manager
+  -> Auth.Scope
+  -> m Auth.AccessToken
+fetchAndUpdateTokenOrReset resources manager scope =
   liftIO
-    $             fetchAndUpdateToken resources scope
-    `onException` MVar.tryPutMVar (HttpT.crCachedTokenMVar resources)
+    $             fetchAndUpdateToken resources manager scope
+    `onException` MVar.tryPutMVar (HttpT.ctrCachedTokenMVar resources)
                                   HttpT.NotInitialized
 
 getToken
   :: (HttpT.HasClientResources m, Logger.HasLogger m, MonadIO m)
   => Auth.Scope
-  -> m Auth.AccessToken
+  -> m (Maybe Auth.AccessToken)
 getToken scope = do
-  resources <- HttpT.askClientResources
-  let tokenMVar = HttpT.crCachedTokenMVar resources
-  liftIO (MVar.takeMVar tokenMVar) >>= \case
-    HttpT.NotInitialized -> do
-      Logger.log Logger.Debug Nothing "Fetching initial token"
-      fetchAndUpdateTokenOrReset resources scope
-    HttpT.Available cachedToken -> do
-      now <- liftIO Time.getCurrentTime
-      let renewThreshold = HttpT.crRenewThreshold resources
-      if Time.diffUTCTime (Auth.expiresAt cachedToken) now < renewThreshold
-        then do
-          Logger.log Logger.Debug Nothing "Token expired, fetching token"
-          fetchAndUpdateTokenOrReset resources scope
-        else do
-          liftIO $ MVar.putMVar tokenMVar (HttpT.Available cachedToken)
-          Logger.log Logger.Debug Nothing "Using cached token"
-          return $ Auth.accessToken (cachedToken :: Auth.CachedToken)
+  clientResources <- HttpT.askClientResources
+  case HttpT.crTargetResorces clientResources of
+    HttpT.Emulator             -> return Nothing
+    HttpT.Cloud cloudResources -> Just <$> do
+      let manager   = HttpT.crManager clientResources
+          tokenMVar = HttpT.ctrCachedTokenMVar cloudResources
+      liftIO (MVar.takeMVar tokenMVar) >>= \case
+        HttpT.NotInitialized -> do
+          Logger.log Logger.Debug Nothing "Fetching initial token"
+          fetchAndUpdateTokenOrReset cloudResources manager scope
+        HttpT.Available cachedToken -> do
+          now <- liftIO Time.getCurrentTime
+          let renewThreshold = HttpT.ctrRenewThreshold cloudResources
+          if Time.diffUTCTime (Auth.expiresAt cachedToken) now < renewThreshold
+            then do
+              Logger.log Logger.Debug Nothing "Token expired, fetching token"
+              fetchAndUpdateTokenOrReset cloudResources manager scope
+            else do
+              liftIO $ MVar.putMVar tokenMVar (HttpT.Available cachedToken)
+              Logger.log Logger.Debug Nothing "Using cached token"
+              return $ Auth.accessToken (cachedToken :: Auth.CachedToken)

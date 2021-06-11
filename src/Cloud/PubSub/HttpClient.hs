@@ -14,14 +14,16 @@ import qualified Cloud.PubSub.Http.Types       as HttpT
 import           Control.Monad.Catch            ( MonadThrow )
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString                ( ByteString )
-import           Data.Functor                   ( void )
+import           Data.Functor                   ( (<&>)
+                                                , void
+                                                )
 import qualified Data.Text.Encoding            as TE
 import           Network.HTTP.Client.Conduit    ( RequestBody(RequestBodyLBS) )
 import qualified Network.HTTP.Conduit          as Http
 import qualified Network.HTTP.Simple           as Http
 import qualified Network.HTTP.Types.Status     as Status
 
-getToken :: AuthT.GoogleApiAuth m => m AuthT.AccessToken
+getToken :: AuthT.GoogleApiAuth m => m (Maybe AuthT.AccessToken)
 getToken = AuthT.getToken scope
   where scope = "https://www.googleapis.com/auth/pubsub"
 
@@ -30,13 +32,16 @@ addAuthHeader token request =
   let headerValue = TE.encodeUtf8 $ "Bearer " <> AuthT.unwrapAccessToken token
   in  Http.addRequestHeader "authorization" headerValue request
 
+authRequest :: HttpT.PubSubHttpClientM m => Http.Request -> m Http.Request
+authRequest request = getToken <&> \case
+  Just token -> addAuthHeader token request
+  Nothing    -> request
+
 authJsonRequest
   :: (HttpT.PubSubHttpClientM m, Aeson.FromJSON r)
   => Http.Request
   -> m (Http.Response r)
-authJsonRequest request = do
-  token <- getToken
-  Http.httpJSON $ addAuthHeader token request
+authJsonRequest request = authRequest request >>= Http.httpJSON
 
 mkRequest
   :: (MonadThrow m, HttpT.HasPubSubHttpManager m)
@@ -119,9 +124,9 @@ authedJsonPostRequest = authedJsonBodyRequest "POST"
 authedNoBodyPostRequest
   :: (HttpT.PubSubHttpClientM m) => HttpT.PathQueryParams -> m ()
 authedNoBodyPostRequest pathQueryParams = do
-  request <- mkRequest "POST" pathQueryParams
-  token   <- getToken
-  void $ Http.httpNoBody $ addAuthHeader token request
+  request       <- mkRequest "POST" pathQueryParams
+  authedRequest <- authRequest request
+  void $ Http.httpNoBody authedRequest
 
 authedNoContentPostRequest
   :: (HttpT.PubSubHttpClientM m, Aeson.ToJSON b)
@@ -129,15 +134,15 @@ authedNoContentPostRequest
   -> b
   -> m ()
 authedNoContentPostRequest pathQueryParams bodyValue = do
-  request <- mkRequest "POST" pathQueryParams
-  let body = RequestBodyLBS $ Aeson.encode bodyValue
-  token <- getToken
-  void $ Http.httpNoBody $ addAuthHeader token $ Http.setRequestBody body
-                                                                     request
+  parsedRequest <- mkRequest "POST" pathQueryParams
+  let body    = RequestBodyLBS $ Aeson.encode bodyValue
+      request = Http.setRequestBody body parsedRequest
+  authedRequest <- authRequest request
+  void $ Http.httpNoBody authedRequest
 
 authedDeleteRequest
   :: HttpT.PubSubHttpClientM m => HttpT.PathQueryParams -> m ()
 authedDeleteRequest pathQueryParams = do
-  request <- mkRequest "DELETE" pathQueryParams
-  token   <- getToken
-  void $ Http.httpNoBody $ addAuthHeader token request
+  request       <- mkRequest "DELETE" pathQueryParams
+  authedRequest <- authRequest request
+  void $ Http.httpNoBody authedRequest

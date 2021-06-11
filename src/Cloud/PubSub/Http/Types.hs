@@ -3,6 +3,7 @@
 module Cloud.PubSub.Http.Types
   ( TokenContainer(..)
   , ClientResources(..)
+  , CloudTargetResources(..)
   , QueryParams(..)
   , HasPubSubHttpManager(..)
   , HasGoogleProjectId(..)
@@ -14,6 +15,7 @@ module Cloud.PubSub.Http.Types
   , RequestError(..)
   , ErrorMessage(..)
   , ErrorRepsonse(..)
+  , TargetResources(..)
   , pageQueryParams
   , isAlreadyExistsError
   , isInvalidArgumentError
@@ -40,12 +42,20 @@ import           Network.HTTP.Conduit           ( Manager )
 data TokenContainer = Available AuthT.CachedToken
                     | NotInitialized
 
+data CloudTargetResources = CloudTargetResources
+  { ctrServiceAccount  :: AuthT.ServiceAccount
+  , ctrCachedTokenMVar :: MVar TokenContainer
+  , ctrRenewThreshold  :: NominalDiffTime
+  }
+
+data TargetResources = Emulator
+                     | Cloud CloudTargetResources
+
 data ClientResources = ClientResources
-  { crServiceAccount  :: AuthT.ServiceAccount
-  , crCachedTokenMVar :: MVar TokenContainer
-  , crManager         :: Manager
-  , crRenewThreshold  :: NominalDiffTime
-  , crBaseUrl         :: String
+  { crManager        :: Manager
+  , crBaseUrl        :: String
+  , crProjectId      :: ProjectId
+  , crTargetResorces :: TargetResources
   }
 
 newtype QueryParams = QueryParams {unwrapQueryParams :: [(ByteString, Maybe ByteString)]}
@@ -66,7 +76,7 @@ class HasPubSubHttpManager m where
 class HasGoogleProjectId m where
   askProjectId :: m ProjectId
   default askProjectId :: (HasClientResources m, Functor  m) => m ProjectId
-  askProjectId = AuthT.saProjectId . crServiceAccount <$> askClientResources
+  askProjectId = crProjectId <$> askClientResources
 
 data PathQueryParams = PathQueryParams
   { path        :: String

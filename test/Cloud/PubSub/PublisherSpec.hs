@@ -28,7 +28,7 @@ publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
 
 
 runTest :: PublisherIO.PublisherIO a -> TestEnv -> IO a
-runTest action (TestEnv env _) = do
+runTest action (TestEnv env) = do
   bracket acquire release $ \pubResources ->
     let publishEnv =
           PublisherIO.PublisherEnv envLogger envClientResources pubResources

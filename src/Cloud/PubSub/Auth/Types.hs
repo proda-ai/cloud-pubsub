@@ -112,4 +112,4 @@ instance Aeson.ToJSON TokenClaims where
     ]
 
 class Monad m => GoogleApiAuth m where
-  getToken :: Scope -> m AccessToken
+  getToken :: Scope -> m (Maybe AccessToken)
