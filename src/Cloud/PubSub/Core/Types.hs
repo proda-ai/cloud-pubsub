@@ -4,7 +4,7 @@ module Cloud.PubSub.Core.Types(
   MessageId(..),
   ProjectId(..),
   TopicName(..),
-  QualifiedTopicName(..),
+  QualifiedTopicName,
   UpdateMask(..),
   qualifyTopicName,
 ) where
