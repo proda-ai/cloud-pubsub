@@ -1,4 +1,8 @@
-module Cloud.PubSub.IO where
+module Cloud.PubSub.Trans
+  ( PubSubEnv(..)
+  , PubSubT
+  , runPubSubT
+  ) where
 
 import qualified Cloud.PubSub.Auth.Token       as AuthToken
 import qualified Cloud.PubSub.Auth.Types       as AuthT
@@ -19,24 +23,23 @@ data PubSubEnv = PubSubEnv
   , clientResources :: HttpT.ClientResources
   }
 
-newtype PubSubIO a = PubSubIO
-  { runPubSubIO :: ReaderT PubSubEnv IO a }
+newtype PubSubT m a = PubSubT
+  { runPubSubT_ :: ReaderT PubSubEnv m a }
   deriving newtype(
     Functor, Applicative, Monad, MonadFail,
     MonadIO, MonadThrow, MonadCatch, MonadMask,
     MonadReader PubSubEnv)
 
-instance HttpT.HasClientResources PubSubIO where
+instance Monad m => HttpT.HasClientResources (PubSubT m) where
   askClientResources = Reader.asks clientResources
-instance HttpT.HasGoogleProjectId PubSubIO
-instance HttpT.HasPubSubHttpManager PubSubIO
+instance Monad m => HttpT.HasGoogleProjectId (PubSubT m)
+instance Monad m => HttpT.HasPubSubHttpManager (PubSubT m)
 
-instance AuthT.GoogleApiAuth PubSubIO where
+instance MonadIO m => AuthT.GoogleApiAuth (PubSubT m) where
   getToken = AuthToken.getToken
 
-instance Logger.HasLogger PubSubIO where
+instance Monad m => Logger.HasLogger (PubSubT m) where
   askLogger = Reader.asks logger
 
-runPubSubIOToIO :: PubSubEnv -> PubSubIO a -> IO a
-runPubSubIOToIO resources action =
-  Reader.runReaderT (runPubSubIO action) resources
+runPubSubT :: PubSubEnv -> PubSubT m a -> m a
+runPubSubT resources action = Reader.runReaderT (runPubSubT_ action) resources

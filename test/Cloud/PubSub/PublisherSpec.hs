@@ -1,7 +1,6 @@
 module Cloud.PubSub.PublisherSpec where
 
 import qualified Cloud.PubSub.Core.Types       as CoreT
-import qualified Cloud.PubSub.IO               as PubSubIO
 import qualified Cloud.PubSub.Publisher        as Publisher
 import qualified Cloud.PubSub.Publisher.IO     as PublisherIO
 import qualified Cloud.PubSub.Publisher.Types  as PublisherT
@@ -14,6 +13,7 @@ import           Cloud.PubSub.TestHelpers       ( TestEnv(..)
                                                 , withTestSub
                                                 , withTestTopic
                                                 )
+import qualified Cloud.PubSub.Trans            as PubSubTrans
 import           Control.Monad.Catch            ( bracket )
 import           Control.Monad.IO.Class         ( liftIO )
 import qualified Control.Monad.Reader          as Reader
@@ -38,7 +38,7 @@ runTest action (TestEnv env) = do
   acquire =
     Publisher.mkPublisherResources envLogger publisherImpl publisherConfig
   release = Publisher.closePublisherResources
-  PubSubIO.PubSubEnv envLogger envClientResources = env
+  PubSubTrans.PubSubEnv envLogger envClientResources = env
 
 publishMessageBatchTest :: TestEnv -> IO ()
 publishMessageBatchTest = runTest $ withTestTopic topic $ do

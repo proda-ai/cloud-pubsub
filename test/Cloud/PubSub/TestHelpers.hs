@@ -6,7 +6,6 @@ import           Cloud.PubSub.Core.Types        ( Message(..)
                                                 )
 import qualified Cloud.PubSub.Core.Types       as Core
 import qualified Cloud.PubSub.Http.Types       as HttpT
-import qualified Cloud.PubSub.IO               as PubSubIO
 import qualified Cloud.PubSub.Logger           as Logger
 import qualified Cloud.PubSub.Snapshot         as Snapshot
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
@@ -15,6 +14,7 @@ import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
 import qualified Cloud.PubSub.Topic            as Topic
 import qualified Cloud.PubSub.Topic.Types      as TopicT
+import qualified Cloud.PubSub.Trans            as PubSubTrans
 import qualified Control.Concurrent.MVar       as MVar
 import           Control.Monad.Catch            ( Exception
                                                 , MonadMask
@@ -28,11 +28,11 @@ import qualified System.IO                     as SystemIO
 import           Test.Hspec                     ( pendingWith )
 
 newtype TestEnv = TestEnv
-  { pubSubEnv  :: PubSubIO.PubSubEnv
+  { pubSubEnv  :: PubSubTrans.PubSubEnv
   }
 
 isEmulated :: TestEnv -> Bool
-isEmulated (TestEnv (PubSubIO.PubSubEnv _ cr)) =
+isEmulated (TestEnv (PubSubTrans.PubSubEnv _ cr)) =
   case HttpT.crTargetResorces cr of
     HttpT.Emulator -> True
     HttpT.Cloud _  -> False
@@ -141,14 +141,14 @@ convertMessage m = Message
   , value = Core.unwrapBase64DataString (SubscriptionT.pmData m)
   }
 
-runTest :: PubSubIO.PubSubIO a -> TestEnv -> IO a
-runTest action env = PubSubIO.runPubSubIOToIO (pubSubEnv env) action
+runTest :: PubSubTrans.PubSubT IO a -> TestEnv -> IO a
+runTest action env = PubSubTrans.runPubSubT (pubSubEnv env) action
 
-runTestIfNotEmulator :: PubSubIO.PubSubIO () -> TestEnv -> IO ()
+runTestIfNotEmulator :: PubSubTrans.PubSubT IO () -> TestEnv -> IO ()
 runTestIfNotEmulator action env = do
   if isEmulated env
     then pendingWith "skipping as action not supported in emulator"
-    else PubSubIO.runPubSubIOToIO (pubSubEnv env) action
+    else PubSubTrans.runPubSubT (pubSubEnv env) action
 
 mkTestPubSubEnv :: IO TestEnv
 mkTestPubSubEnv = do

@@ -15,8 +15,8 @@ import           Cloud.PubSub.Http.Types        ( ClientResources(..)
                                                 , TargetResources(..)
                                                 , TokenContainer(NotInitialized)
                                                 )
-import           Cloud.PubSub.IO                ( PubSubEnv(..) )
 import qualified Cloud.PubSub.Logger           as Logger
+import           Cloud.PubSub.Trans             ( PubSubEnv(..) )
 import qualified Control.Concurrent.MVar       as MVar
 import           Data.Time                      ( NominalDiffTime )
 import qualified Network.HTTP.Client           as HttpClient

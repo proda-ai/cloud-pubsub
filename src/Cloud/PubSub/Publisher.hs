@@ -12,10 +12,10 @@ import           Cloud.PubSub.Core.Types        ( Base64DataString(..)
                                                 , MessageId
                                                 , TopicName
                                                 )
-import qualified Cloud.PubSub.IO               as PubSubIO
 import qualified Cloud.PubSub.Publisher.Types  as PublisherT
 import qualified Cloud.PubSub.Topic            as Topic
 import qualified Cloud.PubSub.Topic.Types      as TopicT
+import qualified Cloud.PubSub.Trans            as PubSubTrans
 import qualified Control.Concurrent.MVar       as MVar
 
 import           Cloud.PubSub.Logger            ( Logger
@@ -170,10 +170,10 @@ extractMessage m = TopicT.PublishPubsubMessage
   , ppmData        = Base64DataString $ value m
   }
 
-mkPublisherImpl :: PubSubIO.PubSubEnv -> PublisherT.PublisherImpl
+mkPublisherImpl :: PubSubTrans.PubSubEnv -> PublisherT.PublisherImpl
 mkPublisherImpl env = PublisherT.PublisherImpl
   { publish = \topicName ->
-                PubSubIO.runPubSubIOToIO env
+                PubSubTrans.runPubSubT env
                   . Topic.publish topicName
                   . map extractMessage
   }

@@ -65,7 +65,7 @@ library:
     - Cloud.PubSub.Core.Types
     - Cloud.PubSub.Http.Types
     - Cloud.PubSub.HttpClient
-    - Cloud.PubSub.IO
+    - Cloud.PubSub.Trans
     - Cloud.PubSub.Logger
     - Cloud.PubSub.Publisher
     - Cloud.PubSub.Publisher.IO
