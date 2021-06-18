@@ -2,7 +2,7 @@ module Cloud.PubSub.PublisherSpec where
 
 import qualified Cloud.PubSub.Core.Types       as CoreT
 import qualified Cloud.PubSub.Publisher        as Publisher
-import qualified Cloud.PubSub.Publisher.IO     as PublisherIO
+import qualified Cloud.PubSub.Publisher.Trans  as PublisherTrans
 import qualified Cloud.PubSub.Publisher.Types  as PublisherT
 import qualified Cloud.PubSub.Subscription     as Subscription
 import qualified Cloud.PubSub.Subscription.Types
@@ -16,7 +16,6 @@ import           Cloud.PubSub.TestHelpers       ( TestEnv(..)
 import qualified Cloud.PubSub.Trans            as PubSubTrans
 import           Control.Monad.Catch            ( bracket )
 import           Control.Monad.IO.Class         ( liftIO )
-import qualified Control.Monad.Reader          as Reader
 import qualified Data.ByteString.Char8         as C8
 import           Test.Hspec
 
@@ -27,12 +26,13 @@ publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
                                              }
 
 
-runTest :: PublisherIO.PublisherIO a -> TestEnv -> IO a
+runTest :: PublisherTrans.PublisherT IO a -> TestEnv -> IO a
 runTest action (TestEnv env) = do
   bracket acquire release $ \pubResources ->
-    let publishEnv =
-          PublisherIO.PublisherEnv envLogger envClientResources pubResources
-    in  Reader.runReaderT (PublisherIO.runPublisherIO action) publishEnv
+    let publishEnv = PublisherTrans.PublisherEnv envLogger
+                                                 envClientResources
+                                                 pubResources
+    in  PublisherTrans.runPublisherT publishEnv action
  where
   publisherImpl = Publisher.mkPublisherImpl env
   acquire =

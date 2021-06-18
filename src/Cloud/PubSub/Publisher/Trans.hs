@@ -1,6 +1,7 @@
-module Cloud.PubSub.Publisher.IO
+module Cloud.PubSub.Publisher.Trans
   ( PublisherEnv(..)
-  , PublisherIO(..)
+  , PublisherT
+  , runPublisherT
   ) where
 
 import qualified Cloud.PubSub.Auth.Token       as AuthToken
@@ -24,23 +25,27 @@ data PublisherEnv = PublisherEnv
   , publisherResources :: PublisherT.PublisherResources
   }
 
-newtype PublisherIO a = PublisherIO
-  { runPublisherIO :: ReaderT PublisherEnv IO a }
+newtype PublisherT m a = PublisherT
+  { runPublisherT_ ::ReaderT PublisherEnv m a }
   deriving newtype(
     Functor, Applicative, Monad, MonadFail,
     MonadIO, MonadThrow, MonadCatch, MonadMask,
     MonadReader PublisherEnv)
 
-instance HttpT.HasClientResources PublisherIO where
+instance Monad m => HttpT.HasClientResources (PublisherT m) where
   askClientResources = Reader.asks clientResources
-instance HttpT.HasGoogleProjectId PublisherIO
-instance HttpT.HasPubSubHttpManager PublisherIO
+instance Monad m => HttpT.HasGoogleProjectId (PublisherT m)
+instance Monad m => HttpT.HasPubSubHttpManager (PublisherT m)
 
-instance AuthT.GoogleApiAuth PublisherIO where
+instance MonadIO m => AuthT.GoogleApiAuth (PublisherT m) where
   getToken = AuthToken.getToken
 
-instance Logger.HasLogger PublisherIO where
+instance Monad m => Logger.HasLogger (PublisherT m) where
   askLogger = Reader.asks logger
 
-instance PublisherT.HasPublisherResources PublisherIO where
+instance Monad m => PublisherT.HasPublisherResources (PublisherT m) where
   askPublisherResources = Reader.asks publisherResources
+
+runPublisherT :: PublisherEnv -> PublisherT m a -> m a
+runPublisherT resources action =
+  Reader.runReaderT (runPublisherT_ action) resources
