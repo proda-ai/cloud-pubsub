@@ -15,11 +15,11 @@ import qualified Cloud.PubSub.Subscription.Types
 import qualified Cloud.PubSub.Topic            as Topic
 import qualified Cloud.PubSub.Topic.Types      as TopicT
 import qualified Cloud.PubSub.Trans            as PubSubTrans
-import qualified Control.Concurrent.MVar       as MVar
 import           Control.Monad.Catch            ( Exception
                                                 , MonadMask
                                                 , bracket_
                                                 )
+import qualified Control.Monad.Logger          as ML
 import qualified Data.HashMap.Strict           as HM
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
@@ -32,23 +32,10 @@ newtype TestEnv = TestEnv
   }
 
 isEmulated :: TestEnv -> Bool
-isEmulated (TestEnv (PubSubTrans.PubSubEnv _ cr)) =
+isEmulated (TestEnv (PubSubTrans.PubSubEnv cr)) =
   case HttpT.crTargetResorces cr of
     HttpT.Emulator -> True
     HttpT.Cloud _  -> False
-
--- This logger may inadvertently cause behaviour to change the mutex
--- may cause non-logging actions to synchronise through monadic
--- composition
-createTestLogger :: IO Logger.Logger
-createTestLogger = do
-  mutex <- MVar.newMVar ()
-  return $ Logger.Logger
-    { logLevel   = Nothing
-    , logMessage = MVar.withMVar mutex
-                   . const
-                   . SystemIO.hPutStrLn SystemIO.stderr
-    }
 
 testServiceAccountPath :: FilePath
 testServiceAccountPath = "./secrets/service_account.json"
@@ -141,14 +128,17 @@ convertMessage m = Message
   , value = Core.unwrapBase64DataString (SubscriptionT.pmData m)
   }
 
+logger :: Logger.LoggerFn
+logger = ML.defaultOutput SystemIO.stderr
+
 runTest :: PubSubTrans.PubSubT IO a -> TestEnv -> IO a
-runTest action env = PubSubTrans.runPubSubT (pubSubEnv env) action
+runTest action env = PubSubTrans.runPubSubT logger (pubSubEnv env) action
 
 runTestIfNotEmulator :: PubSubTrans.PubSubT IO () -> TestEnv -> IO ()
 runTestIfNotEmulator action env = do
   if isEmulated env
     then pendingWith "skipping as action not supported in emulator"
-    else PubSubTrans.runPubSubT (pubSubEnv env) action
+    else PubSubTrans.runPubSubT logger (pubSubEnv env) action
 
 mkTestPubSubEnv :: IO TestEnv
 mkTestPubSubEnv = do
@@ -159,8 +149,7 @@ mkTestPubSubEnv = do
       saFile <- SystemEnv.getEnv "GOOGLE_APPLICATION_CREDENTIALS"
       let authMethod = PubSub.ServiceAccountFile saFile
       return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig 60 authMethod
-  logger <- createTestLogger
-  TestEnv <$> PubSub.mkPubSubEnv projectId target logger
+  TestEnv <$> PubSub.mkPubSubEnv projectId target
 
 data ExpectedError = ExpectedError
   deriving stock (Show, Eq)

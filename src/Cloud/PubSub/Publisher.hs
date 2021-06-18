@@ -12,17 +12,13 @@ import           Cloud.PubSub.Core.Types        ( Base64DataString(..)
                                                 , MessageId
                                                 , TopicName
                                                 )
+import qualified Cloud.PubSub.Logger           as Logger
 import qualified Cloud.PubSub.Publisher.Types  as PublisherT
 import qualified Cloud.PubSub.Topic            as Topic
 import qualified Cloud.PubSub.Topic.Types      as TopicT
 import qualified Cloud.PubSub.Trans            as PubSubTrans
-import qualified Control.Concurrent.MVar       as MVar
-
-import           Cloud.PubSub.Logger            ( Logger
-                                                , verboseLog
-                                                )
-import qualified Cloud.PubSub.Logger           as Logger
 import           Control.Concurrent             ( threadDelay )
+import qualified Control.Concurrent.MVar       as MVar
 import qualified Control.Concurrent.STM        as STM
 import           Control.Concurrent.STM         ( STM )
 import qualified Control.Concurrent.STM.TQueue as TQueue
@@ -37,6 +33,7 @@ import           Control.Monad.Catch            ( MonadThrow
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
+import qualified Control.Monad.Logger          as ML
 import           Data.Aeson                     ( (.=)
                                                 , object
                                                 )
@@ -77,10 +74,11 @@ readBatch queue existing remaining = TQueue.tryReadTQueue queue >>= \case
         return (PublisherT.Full, remaining, existing)
 
 notifySentMsgIds
-  :: Logger -> [PublisherT.PendingMessageBatch] -> [MessageId] -> IO ()
+  :: Logger.LoggerFn -> [PublisherT.PendingMessageBatch] -> [MessageId] -> IO ()
 notifySentMsgIds _      []       _      = return ()
 notifySentMsgIds logger (x : xs) msgIds = do
-  verboseLog logger Logger.Debug ctx "Notifying batch publish success"
+  flip ML.runLoggingT logger
+    $ Logger.logWithContext Logger.Debug ctx "Notifying batch publish success"
   MVar.putMVar (PublisherT.status x) (PublisherT.Sent batchIds)
   notifySentMsgIds logger xs rest
  where
@@ -90,7 +88,7 @@ notifySentMsgIds logger (x : xs) msgIds = do
     Just $ object ["batchId" .= PublisherT.batchId x, "batchSize" .= batchSize]
 
 notifyPublishErr
-  :: Logger
+  :: Logger.LoggerFn
   -> TopicName
   -> SomeException
   -> PublisherT.PendingMessageBatch
@@ -98,12 +96,13 @@ notifyPublishErr
 notifyPublishErr logger topicName e b = do
   let failCtx =
         Just $ object ["batchId" .= PublisherT.batchId b, "topic" .= topicName]
-  verboseLog logger Logger.Error failCtx "Notifying of publish failure"
+  flip ML.runLoggingT logger
+    $ Logger.logWithContext Logger.Error failCtx "Notifying of publish failure"
   MVar.putMVar (PublisherT.status b) (PublisherT.Failed e)
 
 workerLoop
   :: PublisherT.PublisherConfig
-  -> Logger
+  -> Logger.LoggerFn
   -> PublisherT.PublisherImpl
   -> TQueue PublisherT.PendingMessageBatch
   -> Int
@@ -122,8 +121,7 @@ workerLoop config logger publisherImpl queue remaining lastPublishTime topicBatc
        || (batchCapacity == PublisherT.Full)
     then
       do
-        verboseLog
-          logger
+        flip ML.runLoggingT logger $ Logger.logWithContext
           Logger.Debug
           (Just $ object
             [ "batchCapacity" .= batchCapacity
@@ -136,10 +134,11 @@ workerLoop config logger publisherImpl queue remaining lastPublishTime topicBatc
               let batchIds = map PublisherT.batchId pendingMessageBatches
                   pubCtx =
                     Just $ object ["batchIds" .= batchIds, "topic" .= topicName]
-              verboseLog logger
-                         Logger.Debug
-                         pubCtx
-                         "Publishing messages batches"
+              flip ML.runLoggingT logger
+                $ Logger.logWithContext
+                    Logger.Debug
+                    pubCtx
+                    "Publishing messages batches"
               let combinedMessages =
                     concatMap PublisherT.messages pendingMessageBatches
               publishTime <- Time.getCurrentTime
@@ -156,7 +155,8 @@ workerLoop config logger publisherImpl queue remaining lastPublishTime topicBatc
                                     updatedTopicBatchMap
     else
       do
-        verboseLog logger Logger.Debug Nothing "Sleeping and retrying"
+        flip ML.runLoggingT logger
+          $ Logger.logWithContext Logger.Debug Nothing "Sleeping and retrying"
         threadDelay (1000 * 50) -- to avoid spinning wait 50 millis
         workerLoop' updatedRemaining lastPublishTime updatedTopicBatchMap
  where
@@ -170,16 +170,17 @@ extractMessage m = TopicT.PublishPubsubMessage
   , ppmData        = Base64DataString $ value m
   }
 
-mkPublisherImpl :: PubSubTrans.PubSubEnv -> PublisherT.PublisherImpl
-mkPublisherImpl env = PublisherT.PublisherImpl
-  { publish = \topicName ->
-                PubSubTrans.runPubSubT env
-                  . Topic.publish topicName
-                  . map extractMessage
+mkPublisherImpl
+  :: Logger.LoggerFn -> PubSubTrans.PubSubEnv -> PublisherT.PublisherImpl
+mkPublisherImpl logger env = PublisherT.PublisherImpl
+  { publish = \topicName msgs ->
+                PubSubTrans.runPubSubT logger env
+                  $ Topic.publish topicName
+                  $ map extractMessage msgs
   }
 
 mkPublisherResources
-  :: Logger
+  :: Logger.LoggerFn
   -> PublisherT.PublisherImpl
   -> PublisherT.PublisherConfig
   -> IO PublisherT.PublisherResources
@@ -194,7 +195,7 @@ mkPublisherResources logger publisherImpl config = do
     (PublisherT.maxBatchSize config)
     now
     HM.empty
-  return $ PublisherT.PublisherResources reqQueue config workerId logger
+  return $ PublisherT.PublisherResources reqQueue config workerId
 
 closePublisherResources :: PublisherT.PublisherResources -> IO ()
 closePublisherResources = Immortal.stop . PublisherT.worker
@@ -228,7 +229,7 @@ enqueue maxQueueMsgs queue batch = do
 
 publishAsync
   :: ( PublisherT.HasPublisherResources m
-     , Logger.HasLogger m
+     , ML.MonadLogger m
      , MonadThrow m
      , MonadIO m
      )
@@ -248,7 +249,7 @@ publishAsync topicName messages = do
     then do
       pendingMessages <- liftIO
         $ mkPendingMessageBatch batchId topicName messages
-      Logger.log Logger.Debug ctx "Enqueueing batch"
+      Logger.logWithContext Logger.Debug ctx "Enqueueing batch"
       liftIO $ STM.atomically $ enqueue maxQueueMsgs queue pendingMessages
       let status = PublisherT.status pendingMessages
       return $ PublisherT.PublishResult topicName batchId status
@@ -259,23 +260,23 @@ publishAsync topicName messages = do
   where batchMessageCount = length messages
 
 waitForPublishResult
-  :: (Logger.HasLogger m, MonadIO m, MonadThrow m)
+  :: (ML.MonadLogger m, MonadIO m, MonadThrow m)
   => PublisherT.PublishResult
   -> m [MessageId]
 waitForPublishResult result = do
-  Logger.log Logger.Debug ctx "Waiting for messages to be published"
+  Logger.logWithContext Logger.Debug ctx "Waiting for messages to be published"
   liftIO (MVar.readMVar (PublisherT.prStatus result)) >>= \case
     PublisherT.Sent ids -> do
-      Logger.log Logger.Debug ctx "Batch published sucessfully"
+      Logger.logWithContext Logger.Debug ctx "Batch published sucessfully"
       return ids
     PublisherT.Failed e -> do
-      Logger.log Logger.Error ctx "Failed to publish batch"
+      Logger.logWithContext Logger.Error ctx "Failed to publish batch"
       throwM e
   where ctx = Just $ PublisherT.publishResultCtx result
 
 publishSync
   :: ( PublisherT.HasPublisherResources m
-     , Logger.HasLogger m
+     , ML.MonadLogger m
      , MonadIO m
      , MonadThrow m
      )

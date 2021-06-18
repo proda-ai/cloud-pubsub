@@ -15,7 +15,6 @@ import           Cloud.PubSub.Http.Types        ( ClientResources(..)
                                                 , TargetResources(..)
                                                 , TokenContainer(NotInitialized)
                                                 )
-import qualified Cloud.PubSub.Logger           as Logger
 import           Cloud.PubSub.Trans             ( PubSubEnv(..) )
 import qualified Control.Concurrent.MVar       as MVar
 import           Data.Time                      ( NominalDiffTime )
@@ -57,5 +56,5 @@ mkClientResources projectId target = do
   manager <- HttpClient.newManager HttpClientTLS.tlsManagerSettings
   return $ ClientResources manager url projectId targetResources
 
-mkPubSubEnv :: ProjectId -> PubSubTarget -> Logger.Logger -> IO PubSubEnv
-mkPubSubEnv pId psTarget l = PubSubEnv l <$> mkClientResources pId psTarget
+mkPubSubEnv :: ProjectId -> PubSubTarget -> IO PubSubEnv
+mkPubSubEnv pId psTarget = PubSubEnv <$> mkClientResources pId psTarget

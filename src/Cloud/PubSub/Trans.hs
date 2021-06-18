@@ -12,23 +12,23 @@ import           Control.Monad.Catch            ( MonadCatch
                                                 , MonadMask
                                                 , MonadThrow
                                                 )
+import qualified Control.Monad.Logger          as ML
 import           Control.Monad.Reader           ( MonadIO
                                                 , MonadReader
                                                 , ReaderT
                                                 )
 import qualified Control.Monad.Reader          as Reader
 
-data PubSubEnv = PubSubEnv
-  { logger          :: Logger.Logger
-  , clientResources :: HttpT.ClientResources
+newtype PubSubEnv = PubSubEnv
+  { clientResources :: HttpT.ClientResources
   }
 
 newtype PubSubT m a = PubSubT
-  { runPubSubT_ :: ReaderT PubSubEnv m a }
+  { runPubSubT_ :: ReaderT PubSubEnv (ML.LoggingT m) a }
   deriving newtype(
     Functor, Applicative, Monad, MonadFail,
     MonadIO, MonadThrow, MonadCatch, MonadMask,
-    MonadReader PubSubEnv)
+    MonadReader PubSubEnv, ML.MonadLogger)
 
 instance Monad m => HttpT.HasClientResources (PubSubT m) where
   askClientResources = Reader.asks clientResources
@@ -38,8 +38,6 @@ instance Monad m => HttpT.HasPubSubHttpManager (PubSubT m)
 instance MonadIO m => AuthT.GoogleApiAuth (PubSubT m) where
   getToken = AuthToken.getToken
 
-instance Monad m => Logger.HasLogger (PubSubT m) where
-  askLogger = Reader.asks logger
-
-runPubSubT :: PubSubEnv -> PubSubT m a -> m a
-runPubSubT resources action = Reader.runReaderT (runPubSubT_ action) resources
+runPubSubT :: Logger.LoggerFn -> PubSubEnv -> PubSubT m a -> m a
+runPubSubT logger resources action =
+  ML.runLoggingT (Reader.runReaderT (runPubSubT_ action) resources) logger

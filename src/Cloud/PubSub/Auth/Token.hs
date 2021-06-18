@@ -11,6 +11,7 @@ import           Control.Monad.Catch            ( onException )
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
+import           Control.Monad.Logger           ( MonadLogger )
 import qualified Data.Time                     as Time
 import qualified Network.HTTP.Client           as HttpClient
 
@@ -45,7 +46,7 @@ fetchAndUpdateTokenOrReset resources manager scope =
                                   HttpT.NotInitialized
 
 getToken
-  :: (HttpT.HasClientResources m, Logger.HasLogger m, MonadIO m)
+  :: (HttpT.HasClientResources m, MonadLogger m, MonadIO m)
   => Auth.Scope
   -> m (Maybe Auth.AccessToken)
 getToken scope = do
@@ -57,16 +58,18 @@ getToken scope = do
           tokenMVar = HttpT.ctrCachedTokenMVar cloudResources
       liftIO (MVar.takeMVar tokenMVar) >>= \case
         HttpT.NotInitialized -> do
-          Logger.log Logger.Debug Nothing "Fetching initial token"
+          Logger.logWithContext Logger.Debug Nothing "Fetching initial token"
           fetchAndUpdateTokenOrReset cloudResources manager scope
         HttpT.Available cachedToken -> do
           now <- liftIO Time.getCurrentTime
           let renewThreshold = HttpT.ctrRenewThreshold cloudResources
           if Time.diffUTCTime (Auth.expiresAt cachedToken) now < renewThreshold
             then do
-              Logger.log Logger.Debug Nothing "Token expired, fetching token"
+              Logger.logWithContext Logger.Debug
+                                    Nothing
+                                    "Token expired, fetching token"
               fetchAndUpdateTokenOrReset cloudResources manager scope
             else do
               liftIO $ MVar.putMVar tokenMVar (HttpT.Available cachedToken)
-              Logger.log Logger.Debug Nothing "Using cached token"
+              Logger.logWithContext Logger.Debug Nothing "Using cached token"
               return $ Auth.accessToken (cachedToken :: Auth.CachedToken)

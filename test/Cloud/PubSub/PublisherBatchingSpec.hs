@@ -1,11 +1,10 @@
 module Cloud.PubSub.PublisherBatchingSpec where
 
 import qualified Cloud.PubSub.Core.Types       as CoreT
-import qualified Cloud.PubSub.Logger           as Logger
 import qualified Cloud.PubSub.Publisher        as Publisher
 import qualified Cloud.PubSub.Publisher.Types  as PublisherT
 import           Cloud.PubSub.TestHelpers       ( ExpectedError(..)
-                                                , createTestLogger
+                                                , logger
                                                 )
 import qualified Control.Concurrent.STM        as STM
 import qualified Control.Concurrent.STM.TVar   as TVar
@@ -20,6 +19,7 @@ import           Control.Monad.Catch            ( MonadCatch
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
+import qualified Control.Monad.Logger          as ML
 import           Control.Monad.Reader           ( MonadReader
                                                 , ReaderT
                                                 )
@@ -50,26 +50,23 @@ newtype MockPublisherState = MockPublisherState
   { revPublishedBatches :: [PublishedBatch]
   } deriving (Show , Eq)
 
-data MockPublisherEnv = MockPublisherEnv
-  { logger             :: Logger.Logger
-  , publisherResources :: PublisherT.PublisherResources
+newtype MockPublisherEnv = MockPublisherEnv
+  {  publisherResources :: PublisherT.PublisherResources
   }
 
 newtype TestM a = TestM
-  { runTestM :: ReaderT MockPublisherEnv IO a }
+  { runTestM :: ReaderT MockPublisherEnv (ML.LoggingT IO) a }
   deriving newtype(
     Functor, Applicative, Monad, MonadFail,
     MonadIO, MonadThrow, MonadCatch, MonadMask,
-    MonadReader MockPublisherEnv)
+    MonadReader MockPublisherEnv, ML.MonadLogger)
 
 instance PublisherT.HasPublisherResources TestM where
   askPublisherResources = Reader.asks publisherResources
 
-instance Logger.HasLogger TestM where
-  askLogger = Reader.asks logger
-
 runTest :: TestM a -> MockPublisherEnv -> IO a
-runTest action = Reader.runReaderT (runTestM action)
+runTest action env =
+  ML.runLoggingT (Reader.runReaderT (runTestM action) env) logger
 
 addMessage
   :: CoreT.TopicName
@@ -122,12 +119,10 @@ withMockPublisherEnv
   -> (MockPublisherEnv -> IO a)
   -> IO a
 withMockPublisherEnv publisherConfig publisherImpl f = do
-  testLogger <- createTestLogger
-  let acquire = Publisher.mkPublisherResources testLogger
-                                               publisherImpl
-                                               publisherConfig
+  let acquire =
+        Publisher.mkPublisherResources logger publisherImpl publisherConfig
   let release = Publisher.closePublisherResources
-  bracket acquire release (f . MockPublisherEnv testLogger)
+  bracket acquire release (f . MockPublisherEnv)
 
 publishOnMaxBatchSizeTest :: IO ()
 publishOnMaxBatchSizeTest = do

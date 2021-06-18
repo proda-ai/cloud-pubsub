@@ -22,9 +22,9 @@ module Cloud.PubSub.Http.Types
   , simplePath
   ) where
 
+import qualified Control.Monad.Logger          as ML
 import qualified Cloud.PubSub.Auth.Types       as AuthT
 import           Cloud.PubSub.Core.Types        ( ProjectId )
-import qualified Cloud.PubSub.Logger           as Logger
 import           Control.Concurrent.MVar        ( MVar )
 import           Control.Monad.Catch            ( Exception
                                                 , MonadThrow
@@ -91,7 +91,7 @@ type PubSubHttpClientM m
   = ( AuthT.GoogleApiAuth m
     , HasGoogleProjectId m
     , HasPubSubHttpManager m
-    , Logger.HasLogger m
+    , ML.MonadLogger m
     , MonadIO m
     , MonadThrow m
     )

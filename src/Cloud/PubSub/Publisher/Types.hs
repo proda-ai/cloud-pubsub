@@ -19,7 +19,6 @@ import           Cloud.PubSub.Core.Types        ( Message
                                                 , MessageId
                                                 , TopicName
                                                 )
-import           Cloud.PubSub.Logger            ( Logger )
 import           Control.Concurrent             ( MVar )
 import           Control.Concurrent.STM.TQueue  ( TQueue )
 import qualified Control.Immortal              as Immortal
@@ -56,7 +55,6 @@ data PublisherResources = PublisherResources
   { pendingMessageBatchQueue :: TQueue PendingMessageBatch
   , publisherConfig          :: PublisherConfig
   , worker                   :: Immortal.Thread
-  , logger                   :: Logger
   }
 
 class HasPublisherResources m where

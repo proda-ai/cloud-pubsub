@@ -9,6 +9,7 @@ import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
 import           Cloud.PubSub.TestHelpers       ( TestEnv(..)
                                                 , convertMessage
+                                                , logger
                                                 , mkTestPubSubEnv
                                                 , withTestSub
                                                 , withTestTopic
@@ -27,18 +28,15 @@ publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
 
 
 runTest :: PublisherTrans.PublisherT IO a -> TestEnv -> IO a
-runTest action (TestEnv env) = do
+runTest action (TestEnv env@(PubSubTrans.PubSubEnv envClientResources)) = do
   bracket acquire release $ \pubResources ->
-    let publishEnv = PublisherTrans.PublisherEnv envLogger
-                                                 envClientResources
-                                                 pubResources
-    in  PublisherTrans.runPublisherT publishEnv action
+    let publishEnv =
+          PublisherTrans.PublisherEnv envClientResources pubResources
+    in  PublisherTrans.runPublisherT logger publishEnv action
  where
-  publisherImpl = Publisher.mkPublisherImpl env
-  acquire =
-    Publisher.mkPublisherResources envLogger publisherImpl publisherConfig
+  publisherImpl = Publisher.mkPublisherImpl logger env
+  acquire = Publisher.mkPublisherResources logger publisherImpl publisherConfig
   release = Publisher.closePublisherResources
-  PubSubTrans.PubSubEnv envLogger envClientResources = env
 
 publishMessageBatchTest :: TestEnv -> IO ()
 publishMessageBatchTest = runTest $ withTestTopic topic $ do

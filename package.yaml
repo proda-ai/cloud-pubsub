@@ -47,6 +47,7 @@ library:
     - http-conduit
     - http-types
     - immortal
+    - monad-logger
     - mtl
     - stm
     - text
@@ -114,6 +115,7 @@ tests:
       - http-client
       - http-client-tls
       - http-conduit
+      - monad-logger
       - mtl
       - stm
       - text
