@@ -115,6 +115,7 @@ tests:
       - http-client
       - http-client-tls
       - http-conduit
+      - immortal
       - monad-logger
       - mtl
       - stm

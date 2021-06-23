@@ -107,6 +107,7 @@ test-suite cloud-pubsub-test
     , http-client
     , http-client-tls
     , http-conduit
+    , immortal
     , monad-logger
     , mtl
     , stm
