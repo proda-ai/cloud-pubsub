@@ -99,11 +99,8 @@ mkMessages xs =
   [ CoreT.Message (Just "constant-key") (C8.pack $ show x) | x <- xs ]
 
 mkPublisherConfigWithBatchSize :: Int -> PublisherT.PublisherConfig
-mkPublisherConfigWithBatchSize mbs = PublisherT.PublisherConfig
-  { maxQueueMessageSize = 100
-  , maxBatchSize        = mbs
-  , maxBatchDelay       = 0.5
-  }
+mkPublisherConfigWithBatchSize mbs =
+  PublisherT.PublisherConfig { maxBatchSize = mbs, maxBatchDelay = 0.5 }
 
 mkEmptyMockPublisherState :: IO (TVar MockPublisherState)
 mkEmptyMockPublisherState = TVar.newTVarIO $ MockPublisherState []
@@ -171,13 +168,11 @@ publishOnMaxDelayTest = do
         <> " "
         <> show xs
  where
-  testTopic       = "publish-on-max-delay-test"
-  messageCount    = 4
-  messages        = mkMessages [1 .. messageCount]
-  publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
-                                               , maxBatchSize        = 5
-                                               , maxBatchDelay       = 0.5
-                                               }
+  testTopic    = "publish-on-max-delay-test"
+  messageCount = 4
+  messages     = mkMessages [1 .. messageCount]
+  publisherConfig =
+    PublisherT.PublisherConfig { maxBatchSize = 5, maxBatchDelay = 0.5 }
 
 opportunisticBatchingTest :: IO ()
 opportunisticBatchingTest = do

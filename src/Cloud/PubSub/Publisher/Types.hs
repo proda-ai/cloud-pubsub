@@ -1,6 +1,5 @@
 module Cloud.PubSub.Publisher.Types
-  ( BatchCapacity(..)
-  , BatchId
+  ( BatchId
   , HasPublisherResources(..)
   , PendingMessageBatch(..)
   , PublishResult(..)
@@ -9,6 +8,10 @@ module Cloud.PubSub.Publisher.Types
   , PublisherResources(..)
   , MessageBatchSizeExceeded(..)
   , SentStatus(..)
+  , TopicBatch(..)
+  , TopicBatches
+  , addToTopicBatch
+  , newTopicBatch
   , genBatchId
   , pendingMessageBatchSize
   , publishResultCtx
@@ -20,7 +23,7 @@ import           Cloud.PubSub.Core.Types        ( Message
                                                 , TopicName
                                                 )
 import           Control.Concurrent             ( MVar )
-import           Control.Concurrent.STM.TQueue  ( TQueue )
+import           Control.Concurrent.STM.TVar    ( TVar )
 import qualified Control.Immortal              as Immortal
 import           Control.Monad.Catch            ( Exception
                                                 , SomeException
@@ -30,11 +33,15 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 )
 import qualified Data.Aeson                    as Aeson
 import           Data.Aeson                     ( (.=) )
-import           Data.Time                      ( NominalDiffTime )
+import           Data.Time                      ( NominalDiffTime
+                                                , UTCTime
+                                                )
 
+import           Data.DList                     ( DList )
+import qualified Data.DList                    as DList
+import           Data.Map                       ( Map )
 import           Data.UUID                      ( UUID )
 import qualified Data.UUID.V4                  as UUID
-import           GHC.Generics                   ( Generic )
 
 newtype BatchId =
   BatchId { unwrapBatchId :: UUID }
@@ -44,33 +51,53 @@ newtype BatchId =
 genBatchId :: MonadIO m => m BatchId
 genBatchId = BatchId <$> liftIO UUID.nextRandom
 
-data BatchCapacity = Empty | HasRoom | Full
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass(Aeson.ToJSON)
-
 data SentStatus = Sent [MessageId]
                 | Failed SomeException
 
+data TopicBatch = TopicBatch
+  { tbTopic       :: TopicName
+  , tbOldestBatch :: UTCTime
+  , tbTotal       :: Int
+  , tbBatches     :: DList PendingMessageBatch
+  }
+
+newTopicBatch :: PendingMessageBatch -> TopicBatch
+newTopicBatch pmb = TopicBatch { tbTopic       = topic pmb
+                               , tbOldestBatch = enqueueTime pmb
+                               , tbTotal       = pendingMessageBatchSize pmb
+                               , tbBatches     = DList.fromList [pmb]
+                               }
+
+addToTopicBatch :: PendingMessageBatch -> TopicBatch -> TopicBatch
+addToTopicBatch pmb tb = TopicBatch
+  { tbTopic       = tbTopic tb
+  , tbOldestBatch = min (enqueueTime pmb) (tbOldestBatch tb)
+  , tbTotal       = tbTotal tb + pendingMessageBatchSize pmb
+  , tbBatches     = DList.snoc (tbBatches tb) pmb
+  }
+
+type TopicBatches = Map TopicName TopicBatch
+
 data PublisherResources = PublisherResources
-  { pendingMessageBatchQueue :: TQueue PendingMessageBatch
-  , publisherConfig          :: PublisherConfig
-  , worker                   :: Immortal.Thread
+  { pendingTopicBatches :: TVar TopicBatches
+  , publisherConfig     :: PublisherConfig
+  , worker              :: Immortal.Thread
   }
 
 class HasPublisherResources m where
   askPublisherResources :: m PublisherResources
 
 data PublisherConfig = PublisherConfig
-  { maxQueueMessageSize :: Int
-  , maxBatchSize        :: Int
-  , maxBatchDelay       :: NominalDiffTime
+  { maxBatchSize  :: Int
+  , maxBatchDelay :: NominalDiffTime
   }
 
 data PendingMessageBatch = PendingMessageBatch
-  { batchId  :: BatchId
-  , topic    :: TopicName
-  , status   :: MVar SentStatus
-  , messages :: [Message]
+  { batchId     :: BatchId
+  , enqueueTime :: UTCTime
+  , topic       :: TopicName
+  , status      :: MVar SentStatus
+  , messages    :: [Message]
   }
 
 pendingMessageBatchSize :: PendingMessageBatch -> Int

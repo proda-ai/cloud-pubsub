@@ -1,18 +1,17 @@
-module Cloud.PubSub.Core.Types(
-  Base64DataString(..),
-  Message(..), 
-  MessageId(..),
-  ProjectId(..),
-  TopicName(..),
-  QualifiedTopicName,
-  UpdateMask(..),
-  qualifyTopicName,
-) where
+module Cloud.PubSub.Core.Types
+  ( Base64DataString(..)
+  , Message(..)
+  , MessageId(..)
+  , ProjectId(..)
+  , TopicName(..)
+  , QualifiedTopicName
+  , UpdateMask(..)
+  , qualifyTopicName
+  ) where
 
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Base64        as Base64
-import           Data.Hashable                  ( Hashable )
 import           Data.String                    ( IsString )
 import           Data.Text                      ( Text )
 import qualified Data.Text.Encoding            as TE
@@ -28,7 +27,7 @@ newtype TopicName  = TopicName
   { unwrapTopicName :: Text
   }
   deriving stock (Show, Eq, Generic)
-  deriving newtype (IsString, Aeson.ToJSON, Aeson.FromJSON, Hashable)
+  deriving newtype (IsString, Aeson.ToJSON, Aeson.FromJSON, Ord)
 
 newtype ProjectId = ProjectId {unwrapProjectId :: Text}
   deriving stock (Show)

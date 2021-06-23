@@ -21,8 +21,8 @@ import           Control.Concurrent             ( threadDelay )
 import qualified Control.Concurrent.MVar       as MVar
 import qualified Control.Concurrent.STM        as STM
 import           Control.Concurrent.STM         ( STM )
-import qualified Control.Concurrent.STM.TQueue as TQueue
-import           Control.Concurrent.STM.TQueue  ( TQueue )
+import           Control.Concurrent.STM.TVar    ( TVar )
+import qualified Control.Concurrent.STM.TVar   as TVar
 import qualified Control.Immortal              as Immortal
 import           Control.Monad                  ( forM_ )
 import           Control.Monad.Catch            ( MonadThrow
@@ -37,41 +37,9 @@ import qualified Control.Monad.Logger          as ML
 import           Data.Aeson                     ( (.=)
                                                 , object
                                                 )
-import           Data.HashMap.Strict            ( HashMap )
-import qualified Data.HashMap.Strict           as HM
+import qualified Data.DList                    as DList
+import qualified Data.Map.Strict               as Map
 import qualified Data.Time                     as Time
-
-getBatchMessageCount :: PublisherT.PendingMessageBatch -> Int
-getBatchMessageCount = length . PublisherT.messages
-
-getBatchListSum :: [PublisherT.PendingMessageBatch] -> Int
-getBatchListSum = sum . map getBatchMessageCount
-
-type TopicBatchMap = HashMap TopicName [PublisherT.PendingMessageBatch]
-
-readBatch
-  :: TQueue PublisherT.PendingMessageBatch
-  -> TopicBatchMap
-  -> Int
-  -> STM (PublisherT.BatchCapacity, Int, TopicBatchMap)
-readBatch _ xs 0 = if HM.null xs
-  then return (PublisherT.Empty, 0, xs)
-  else return (PublisherT.Full, 0, xs)
-readBatch queue existing remaining = TQueue.tryReadTQueue queue >>= \case
-  Nothing -> if HM.null existing
-    then return (PublisherT.Empty, remaining, existing)
-    else return (PublisherT.HasRoom, remaining, existing)
-  Just batch -> do
-    let batchMessageCount = PublisherT.pendingMessageBatchSize batch
-    if remaining >= batchMessageCount
-      then
-        let updated =
-              HM.insertWith (++) (PublisherT.topic batch) [batch] existing
-            updatedRemaining = remaining - batchMessageCount
-        in  readBatch queue updated updatedRemaining
-      else do
-        TQueue.unGetTQueue queue batch
-        return (PublisherT.Full, remaining, existing)
 
 notifySentMsgIds
   :: Logger.LoggerFn -> [PublisherT.PendingMessageBatch] -> [MessageId] -> IO ()
@@ -100,69 +68,45 @@ notifyPublishErr logger topicName e b = do
     $ Logger.logWithContext Logger.Error failCtx "Notifying of publish failure"
   MVar.putMVar (PublisherT.status b) (PublisherT.Failed e)
 
+readBatch
+  :: PublisherT.PublisherConfig
+  -> Time.UTCTime
+  -> TVar PublisherT.TopicBatches
+  -> IO PublisherT.TopicBatches
+readBatch config readTime topicBatchesTVar = STM.atomically
+  $ TVar.stateTVar topicBatchesTVar (Map.partition decideBatch)
+ where
+  decideBatch tb =
+    let timeSinceBatchCreated =
+          Time.diffUTCTime readTime $ PublisherT.tbOldestBatch tb
+    in  (timeSinceBatchCreated >= maxDelay)
+          || (PublisherT.tbTotal tb >= maxBatchSize)
+  maxDelay     = PublisherT.maxBatchDelay config
+  maxBatchSize = PublisherT.maxBatchSize config
+
 workerLoop
   :: PublisherT.PublisherConfig
   -> Logger.LoggerFn
   -> PublisherT.PublisherImpl
-  -> TQueue PublisherT.PendingMessageBatch
-  -> Int
-  -> Time.UTCTime
-  -> TopicBatchMap
+  -> TVar PublisherT.TopicBatches
   -> IO ()
-workerLoop config logger publisherImpl queue remaining lastPublishTime topicBatchMap
-  = do
-    now <- Time.getCurrentTime
-    (batchCapacity, updatedRemaining, updatedTopicBatchMap) <-
-      liftIO $ STM.atomically $ readBatch queue topicBatchMap remaining
-    let timeSinceLastPublish = Time.diffUTCTime now lastPublishTime
-    if (  (timeSinceLastPublish >= maxDelay)
-       && (batchCapacity /= PublisherT.Empty)
-       )
-       || (batchCapacity == PublisherT.Full)
-    then
-      do
-        flip ML.runLoggingT logger $ Logger.logWithContext
-          Logger.Debug
-          (Just $ object
-            [ "batchCapacity" .= batchCapacity
-            , "timeSinceLastPublish" .= timeSinceLastPublish
-            ]
-          )
-          "Publishing batches"
-        forM_ (HM.toList updatedTopicBatchMap)
-          $ \(topicName, pendingMessageBatches) -> do
-              let batchIds = map PublisherT.batchId pendingMessageBatches
-                  pubCtx =
-                    Just $ object ["batchIds" .= batchIds, "topic" .= topicName]
-              flip ML.runLoggingT logger
-                $ Logger.logWithContext
-                    Logger.Debug
-                    pubCtx
-                    "Publishing messages batches"
-              let combinedMessages =
-                    concatMap PublisherT.messages pendingMessageBatches
-              publishTime <- Time.getCurrentTime
-              try (PublisherT.publish publisherImpl topicName combinedMessages)
-                >>= \case
-                      Right msgIds -> do
-                        notifySentMsgIds logger pendingMessageBatches msgIds
-                        workerLoop' maxBatchSize publishTime HM.empty
-                      Left e -> do
-                        liftIO $ mapM_ (notifyPublishErr logger topicName e)
-                                       pendingMessageBatches
-                        workerLoop' updatedRemaining
-                                    lastPublishTime
-                                    updatedTopicBatchMap
-    else
-      do
-        flip ML.runLoggingT logger
-          $ Logger.logWithContext Logger.Debug Nothing "Sleeping and retrying"
-        threadDelay (1000 * 50) -- to avoid spinning wait 50 millis
-        workerLoop' updatedRemaining lastPublishTime updatedTopicBatchMap
- where
-  workerLoop'  = workerLoop config logger publisherImpl queue
-  maxDelay     = PublisherT.maxBatchDelay config
-  maxBatchSize = PublisherT.maxBatchSize config
+workerLoop config logger publisherImpl topicBatchesTVar = do
+  now      <- Time.getCurrentTime
+  consumed <- readBatch config now topicBatchesTVar
+  forM_ (Map.toList consumed) $ \(topic, tb) -> do
+    let pmbs             = DList.toList $ PublisherT.tbBatches tb
+        batchIds         = map PublisherT.batchId pmbs
+        pubCtx = Just $ object ["batchIds" .= batchIds, "topic" .= topic]
+        combinedMessages = concatMap PublisherT.messages pmbs
+    flip ML.runLoggingT logger
+      $ Logger.logWithContext Logger.Debug pubCtx "Publishing messages batches"
+    try (PublisherT.publish publisherImpl topic combinedMessages) >>= \case
+      Right msgIds -> do
+        notifySentMsgIds logger pmbs msgIds
+      Left e -> do
+        liftIO $ mapM_ (notifyPublishErr logger topic e) pmbs
+  threadDelay (1000 * 10) -- to avoid spinning wait 10 millis
+  workerLoop config logger publisherImpl topicBatchesTVar
 
 extractMessage :: Message -> TopicT.PublishPubsubMessage
 extractMessage m = TopicT.PublishPubsubMessage
@@ -185,17 +129,12 @@ mkPublisherResources
   -> PublisherT.PublisherConfig
   -> IO PublisherT.PublisherResources
 mkPublisherResources logger publisherImpl config = do
-  reqQueue <- TQueue.newTQueueIO
-  now      <- Time.getCurrentTime
-  workerId <- Immortal.create $ const $ workerLoop
-    config
-    logger
-    publisherImpl
-    reqQueue
-    (PublisherT.maxBatchSize config)
-    now
-    HM.empty
-  return $ PublisherT.PublisherResources reqQueue config workerId
+  topicBatchesTVar <- TVar.newTVarIO Map.empty
+  workerId         <- Immortal.create $ const $ workerLoop config
+                                                           logger
+                                                           publisherImpl
+                                                           topicBatchesTVar
+  return $ PublisherT.PublisherResources topicBatchesTVar config workerId
 
 closePublisherResources :: PublisherT.PublisherResources -> IO ()
 closePublisherResources = Immortal.stop . PublisherT.worker
@@ -206,26 +145,35 @@ mkPendingMessageBatch
   -> [Message]
   -> IO PublisherT.PendingMessageBatch
 mkPendingMessageBatch bId topicName messages = do
+  now        <- Time.getCurrentTime
   statusMVar <- MVar.newEmptyMVar
-  return $ PublisherT.PendingMessageBatch { batchId  = bId
-                                          , topic    = topicName
-                                          , messages = messages
-                                          , status   = statusMVar
+  return $ PublisherT.PendingMessageBatch { batchId     = bId
+                                          , enqueueTime = now
+                                          , topic       = topicName
+                                          , messages    = messages
+                                          , status      = statusMVar
                                           }
 
 enqueue
   :: Int
-  -> TQueue PublisherT.PendingMessageBatch
+  -> TVar PublisherT.TopicBatches
   -> PublisherT.PendingMessageBatch
   -> STM ()
-enqueue maxQueueMsgs queue batch = do
-  reqs <- TQueue.flushTQueue queue
-  let queueMsgCount = getBatchListSum reqs
-  if queueMsgCount + getBatchMessageCount batch <= maxQueueMsgs
-    then do
-      mapM_ (TQueue.unGetTQueue queue) reqs
-      TQueue.writeTQueue queue batch
-    else STM.retry
+enqueue maxQueueMsgs topicBatchesTVar batch = do
+  topicBatches        <- TVar.readTVar topicBatchesTVar
+  updatedTopicBatches <- Map.alterF addBatch
+                                    (PublisherT.topic batch)
+                                    topicBatches
+  TVar.writeTVar topicBatchesTVar updatedTopicBatches
+ where
+  batchSize = PublisherT.pendingMessageBatchSize batch
+  addBatch Nothing = return $ Just $ PublisherT.newTopicBatch batch
+  addBatch (Just topicBatch) =
+    if PublisherT.tbTotal topicBatch + batchSize <= maxQueueMsgs
+      then
+        let updatedTopicBatch = PublisherT.addToTopicBatch batch topicBatch
+        in  return $ Just updatedTopicBatch
+      else STM.retry
 
 publishAsync
   :: ( PublisherT.HasPublisherResources m
@@ -239,9 +187,8 @@ publishAsync
 publishAsync topicName messages = do
   batchId   <- PublisherT.genBatchId
   resources <- PublisherT.askPublisherResources
-  let queue        = PublisherT.pendingMessageBatchQueue resources
+  let pendingTVar  = PublisherT.pendingTopicBatches resources
       config       = PublisherT.publisherConfig resources
-      maxQueueMsgs = PublisherT.maxQueueMessageSize config
       maxBatchSize = PublisherT.maxBatchSize config
       ctx          = Just $ object ["topic" .= topicName, "batchId" .= batchId]
 
@@ -250,7 +197,8 @@ publishAsync topicName messages = do
       pendingMessages <- liftIO
         $ mkPendingMessageBatch batchId topicName messages
       Logger.logWithContext Logger.Debug ctx "Enqueueing batch"
-      liftIO $ STM.atomically $ enqueue maxQueueMsgs queue pendingMessages
+      liftIO $ STM.atomically $ enqueue maxBatchSize pendingTVar pendingMessages
+      Logger.logWithContext Logger.Debug ctx "Enqueued batch"
       let status = PublisherT.status pendingMessages
       return $ PublisherT.PublishResult topicName batchId status
     else throwM $ PublisherT.MessageBatchSizeExceeded

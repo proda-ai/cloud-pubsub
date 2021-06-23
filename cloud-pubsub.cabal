@@ -55,7 +55,9 @@ library
     , base64-bytestring
     , bytestring
     , clock
+    , containers
     , cryptonite
+    , dlist
     , exceptions
     , hashable
     , http-client

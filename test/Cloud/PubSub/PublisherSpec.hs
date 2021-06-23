@@ -21,10 +21,8 @@ import qualified Data.ByteString.Char8         as C8
 import           Test.Hspec
 
 publisherConfig :: PublisherT.PublisherConfig
-publisherConfig = PublisherT.PublisherConfig { maxQueueMessageSize = 100
-                                             , maxBatchSize        = 20
-                                             , maxBatchDelay       = 0.1
-                                             }
+publisherConfig =
+  PublisherT.PublisherConfig { maxBatchSize = 20, maxBatchDelay = 0.1 }
 
 
 runTest :: PublisherTrans.PublisherT IO a -> TestEnv -> IO a

@@ -37,6 +37,8 @@ library:
   dependencies:
     - aeson
     - clock
+    - containers
+    - dlist
     - base64-bytestring
     - bytestring
     - cryptonite
