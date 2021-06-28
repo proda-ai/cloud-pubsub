@@ -140,17 +140,47 @@ runTestIfNotEmulator action env = do
     then pendingWith "skipping as action not supported in emulator"
     else PubSubTrans.runPubSubT logger (pubSubEnv env) action
 
-mkTestPubSubEnv :: IO TestEnv
-mkTestPubSubEnv = do
-  projectId <- Core.ProjectId . Text.pack <$> SystemEnv.getEnv "PROJECT_ID"
-  target    <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST" >>= \case
-    Just hostAndPortStr ->
+getProjectId :: IO (Maybe Core.ProjectId)
+getProjectId =
+  fmap (Core.ProjectId . Text.pack) <$> SystemEnv.lookupEnv "PROJECT_ID"
+
+getPubSubTarget :: IO PubSub.PubSubTarget
+getPubSubTarget = do
+  maybeEmulatorHost <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST"
+  maybeSaFile       <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
+  case (maybeEmulatorHost, maybeSaFile) of
+    (Just hostAndPortStr, Nothing) ->
       return $ PubSub.EmulatorTarget $ PubSub.HostAndPort hostAndPortStr
-    Nothing -> do
-      saFile <- SystemEnv.getEnv "GOOGLE_APPLICATION_CREDENTIALS"
+    (Nothing, Just saFile) ->
       let authMethod = PubSub.ServiceAccountFile saFile
-      return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig 60 authMethod
-  TestEnv <$> PubSub.mkPubSubEnv projectId target
+      in  return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig 60 authMethod
+    (_, _) ->
+      error
+        "Please specify either \"PUBSUB_EMULATOR_HOST\" or \
+        \\"GOOGLE_APPLICATION_CREDENTIALS\" depending whether you to run \
+        \the tests against the emulator or the cloud hosted version."
+
+usageMessage :: String
+usageMessage = unlines
+  [ "Missing config: Tests can be run against the hosted Cloud PubSub service \
+    \or the emulator. The emulator does not have full API coverage and as such \
+    \some tests are not run when the tests are with the emulator."
+  , "To run tests with the hosted Cloud PubSub, please set the enviroment \
+    \variable \"GOOGLE_APPLICATION_CREDENTIALS\" to the path to the \
+    \service account keys in JSON format and specify Google Cloud Project ID \
+    \via the \"PROJECT_ID\" environment variable. Given that service accounts \
+    \can be used across projects \"project_id\" field in the JSON key file \
+    \is ignored."
+  , "To run against the emulator please start the emulator and set the \
+    \\"PUBSUB_EMULATOR_HOST\" and the \"PROJECT_ID\" environment variables."
+  ]
+
+mkTestPubSubEnv :: IO TestEnv
+mkTestPubSubEnv = getProjectId >>= \case
+  Nothing        -> error usageMessage
+  Just projectId -> do
+    target <- getPubSubTarget
+    TestEnv <$> PubSub.mkPubSubEnv projectId target
 
 data ExpectedError = ExpectedError
   deriving stock (Show, Eq)

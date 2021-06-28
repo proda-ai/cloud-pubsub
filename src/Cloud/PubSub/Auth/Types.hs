@@ -11,7 +11,6 @@ module Cloud.PubSub.Auth.Types
   , X509PrivateKey(..)
   ) where
 
-import           Cloud.PubSub.Core.Types        ( ProjectId )
 import           Crypto.PubKey.RSA.Types        ( PrivateKey )
 import qualified Data.Aeson                    as Aeson
 import           Data.Aeson                     ( (.=) )
@@ -44,7 +43,8 @@ instance Aeson.FromJSON X509PrivateKey where
 
 data ServiceAccount = ServiceAccount
   { saType                    :: Text
-  , saProjectId               :: ProjectId
+  -- Given that service accounts can be used acrooss projects 
+  -- "project_id" is ignored
   , saPrivateKeyId            :: PrivateKeyId
   , saPrivateKey              :: X509PrivateKey
   , saClientEmail             :: Text
