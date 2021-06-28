@@ -46,7 +46,7 @@ notifySentMsgIds
 notifySentMsgIds _      []       _      = return ()
 notifySentMsgIds logger (x : xs) msgIds = do
   flip ML.runLoggingT logger
-    $ Logger.logWithContext Logger.Debug ctx "Notifying batch publish success"
+    $ Logger.logWithContext ML.LevelDebug ctx "Notifying batch publish success"
   MVar.putMVar (PublisherT.status x) (PublisherT.Sent batchIds)
   notifySentMsgIds logger xs rest
  where
@@ -65,7 +65,7 @@ notifyPublishErr logger topicName e b = do
   let failCtx =
         Just $ object ["batchId" .= PublisherT.batchId b, "topic" .= topicName]
   flip ML.runLoggingT logger
-    $ Logger.logWithContext Logger.Error failCtx "Notifying of publish failure"
+    $ Logger.logWithContext ML.LevelError failCtx "Notifying of publish failure"
   MVar.putMVar (PublisherT.status b) (PublisherT.Failed e)
 
 readBatch
@@ -99,7 +99,7 @@ workerLoop config logger publisherImpl topicBatchesTVar = do
         pubCtx = Just $ object ["batchIds" .= batchIds, "topic" .= topic]
         combinedMessages = concatMap PublisherT.messages pmbs
     flip ML.runLoggingT logger
-      $ Logger.logWithContext Logger.Debug pubCtx "Publishing messages batches"
+      $ Logger.logWithContext ML.LevelDebug pubCtx "Publishing messages batches"
     try (PublisherT.publish publisherImpl topic combinedMessages) >>= \case
       Right msgIds -> do
         notifySentMsgIds logger pmbs msgIds
@@ -196,9 +196,9 @@ publishAsync topicName messages = do
     then do
       pendingMessages <- liftIO
         $ mkPendingMessageBatch batchId topicName messages
-      Logger.logWithContext Logger.Debug ctx "Enqueueing batch"
+      Logger.logWithContext ML.LevelDebug ctx "Enqueueing batch"
       liftIO $ STM.atomically $ enqueue maxBatchSize pendingTVar pendingMessages
-      Logger.logWithContext Logger.Debug ctx "Enqueued batch"
+      Logger.logWithContext ML.LevelDebug ctx "Enqueued batch"
       let status = PublisherT.status pendingMessages
       return $ PublisherT.PublishResult topicName batchId status
     else throwM $ PublisherT.MessageBatchSizeExceeded
@@ -212,13 +212,13 @@ waitForPublishResult
   => PublisherT.PublishResult
   -> m [MessageId]
 waitForPublishResult result = do
-  Logger.logWithContext Logger.Debug ctx "Waiting for messages to be published"
+  Logger.logWithContext ML.LevelDebug ctx "Waiting for messages to be published"
   liftIO (MVar.readMVar (PublisherT.prStatus result)) >>= \case
     PublisherT.Sent ids -> do
-      Logger.logWithContext Logger.Debug ctx "Batch published sucessfully"
+      Logger.logWithContext ML.LevelDebug ctx "Batch published sucessfully"
       return ids
     PublisherT.Failed e -> do
-      Logger.logWithContext Logger.Error ctx "Failed to publish batch"
+      Logger.logWithContext ML.LevelError ctx "Failed to publish batch"
       throwM e
   where ctx = Just $ PublisherT.publishResultCtx result
 

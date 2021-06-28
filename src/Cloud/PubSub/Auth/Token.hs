@@ -12,6 +12,7 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
 import           Control.Monad.Logger           ( MonadLogger )
+import qualified Control.Monad.Logger          as ML
 import qualified Data.Time                     as Time
 import qualified Network.HTTP.Client           as HttpClient
 
@@ -58,18 +59,18 @@ getToken scope = do
           tokenMVar = HttpT.ctrCachedTokenMVar cloudResources
       liftIO (MVar.takeMVar tokenMVar) >>= \case
         HttpT.NotInitialized -> do
-          Logger.logWithContext Logger.Debug Nothing "Fetching initial token"
+          Logger.logWithContext ML.LevelDebug Nothing "Fetching initial token"
           fetchAndUpdateTokenOrReset cloudResources manager scope
         HttpT.Available cachedToken -> do
           now <- liftIO Time.getCurrentTime
           let renewThreshold = HttpT.ctrRenewThreshold cloudResources
           if Time.diffUTCTime (Auth.expiresAt cachedToken) now < renewThreshold
             then do
-              Logger.logWithContext Logger.Debug
+              Logger.logWithContext ML.LevelDebug
                                     Nothing
                                     "Token expired, fetching token"
               fetchAndUpdateTokenOrReset cloudResources manager scope
             else do
               liftIO $ MVar.putMVar tokenMVar (HttpT.Available cachedToken)
-              Logger.logWithContext Logger.Debug Nothing "Using cached token"
+              Logger.logWithContext ML.LevelDebug Nothing "Using cached token"
               return $ Auth.accessToken (cachedToken :: Auth.CachedToken)
