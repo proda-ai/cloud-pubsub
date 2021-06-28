@@ -1,7 +1,7 @@
 module Cloud.PubSub
   ( AuthMethod(..)
   , CloudConfig(..)
-  , HostPort(..)
+  , HostAndPort(..)
   , PubSubTarget(..)
   , mkClientResources
   , mkPubSubEnv
@@ -24,7 +24,7 @@ import qualified Network.HTTP.Client.TLS       as HttpClientTLS
 newtype AuthMethod = ServiceAccountFile FilePath
                   deriving (Show, Eq)
 
-newtype HostPort = HostPort { unwrapHostPort :: String }
+newtype HostAndPort = HostAndPort { unwrapHostAndPort :: String }
                        deriving (Show, Eq)
 
 data CloudConfig = CloudConfig
@@ -33,16 +33,16 @@ data CloudConfig = CloudConfig
   }
   deriving (Show, Eq)
 
-data PubSubTarget = EmulatorTarget HostPort
+data PubSubTarget = EmulatorTarget HostAndPort
                   | CloudServiceTarget CloudConfig
                     deriving (Show,Eq)
 
 mkClientResources :: ProjectId -> PubSubTarget -> IO ClientResources
 mkClientResources projectId target = do
   (url, targetResources) <- case target of
-    EmulatorTarget hostPort -> do
-      let hostPortUrl = "http://" <> unwrapHostPort hostPort
-      return (hostPortUrl, Emulator)
+    EmulatorTarget hostAndPort -> do
+      let hostAndPortUrl = "http://" <> unwrapHostAndPort hostAndPort
+      return (hostAndPortUrl, Emulator)
     CloudServiceTarget (CloudConfig threshold (ServiceAccountFile saFile)) ->
       do
         resources <-

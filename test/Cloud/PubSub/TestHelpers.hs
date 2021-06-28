@@ -144,8 +144,9 @@ mkTestPubSubEnv :: IO TestEnv
 mkTestPubSubEnv = do
   projectId <- Core.ProjectId . Text.pack <$> SystemEnv.getEnv "PROJECT_ID"
   target    <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST" >>= \case
-    Just hostPort -> return $ PubSub.EmulatorTarget $ PubSub.HostPort hostPort
-    Nothing       -> do
+    Just hostAndPortStr ->
+      return $ PubSub.EmulatorTarget $ PubSub.HostAndPort hostAndPortStr
+    Nothing -> do
       saFile <- SystemEnv.getEnv "GOOGLE_APPLICATION_CREDENTIALS"
       let authMethod = PubSub.ServiceAccountFile saFile
       return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig 60 authMethod
