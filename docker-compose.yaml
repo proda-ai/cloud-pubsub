@@ -1,0 +1,10 @@
+version: "3.5"
+
+services:
+  pubsub-emulator:
+    build:
+      context: ./emulator
+    environment:
+      PROJECT_ID: ${PROJECT_ID}
+    ports: 
+      - "8085:8085"

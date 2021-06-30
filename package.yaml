@@ -1,0 +1,127 @@
+name: cloud-pubsub
+version: 0.1.0.0
+license: BSD3
+author: "PRODA LTD"
+maintainer: "engineering@proda.ai"
+copyright: "2021 PRODA LTD"
+
+extra-source-files:
+  - README.md
+  - ChangeLog.md
+
+description: Please see the README on GitHub at <https://github.com/proda-ai/cloud-pubsub#readme>
+
+dependencies:
+  - base >= 4.7 && < 5
+
+default-extensions:
+  - DefaultSignatures
+  - DeriveAnyClass
+  - DeriveGeneric
+  - DerivingStrategies
+  - DuplicateRecordFields
+  - GeneralizedNewtypeDeriving
+  - LambdaCase
+  - OverloadedStrings
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wredundant-constraints
+  - -Wno-deprecations
+
+library:
+  source-dirs: src
+  dependencies:
+    - aeson
+    - clock
+    - containers
+    - dlist
+    - base64-bytestring
+    - bytestring
+    - cryptonite
+    - exceptions
+    - hashable
+    - http-client
+    - http-client-tls
+    - http-conduit
+    - http-types
+    - immortal
+    - monad-logger
+    - mtl
+    - stm
+    - text
+    - time
+    - unordered-containers
+    - uuid
+    - x509
+    - x509-store
+  exposed-modules:
+    - Cloud.PubSub
+    - Cloud.PubSub.Auth
+    - Cloud.PubSub.Auth.Token
+    - Cloud.PubSub.Auth.Types
+    - Cloud.PubSub.Consumer
+    - Cloud.PubSub.Core.Json
+    - Cloud.PubSub.Core.Types
+    - Cloud.PubSub.Http.Types
+    - Cloud.PubSub.HttpClient
+    - Cloud.PubSub.Trans
+    - Cloud.PubSub.Logger
+    - Cloud.PubSub.Publisher
+    - Cloud.PubSub.Publisher.Trans
+    - Cloud.PubSub.Publisher.Types
+    - Cloud.PubSub.Schema
+    - Cloud.PubSub.Schema.Types
+    - Cloud.PubSub.Snapshot
+    - Cloud.PubSub.Snapshot.Types
+    - Cloud.PubSub.Subscription
+    - Cloud.PubSub.Subscription.Types
+    - Cloud.PubSub.Topic
+    - Cloud.PubSub.Topic.Types
+    - Cloud.PubSub.TopicSnapshots
+    - Cloud.PubSub.TopicSubscriptions
+
+tests:
+  cloud-pubsub-test:
+    main: Main.hs
+    other-modules:
+      - Cloud.PubSub.AuthSpec
+      - Cloud.PubSub.ConsumerSpec
+      - Cloud.PubSub.PublisherSpec
+      - Cloud.PubSub.PublisherBatchingSpec
+      - Cloud.PubSub.SchemaSpec
+      - Cloud.PubSub.SnapshotSpec
+      - Cloud.PubSub.SubscriptionSpec
+      - Cloud.PubSub.TestHelpers
+      - Cloud.PubSub.TopicSnapshotsSpec
+      - Cloud.PubSub.TopicSpec
+      - Cloud.PubSub.TopicSubscriptionsSpec
+      - Spec
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - aeson
+      - aeson-qq
+      - async
+      - bytestring
+      - cloud-pubsub
+      - exceptions
+      - hspec
+      - hspec-discover
+      - http-client
+      - http-client-tls
+      - http-conduit
+      - immortal
+      - monad-logger
+      - mtl
+      - stm
+      - text
+      - time
+      - unordered-containers
+      - uuid

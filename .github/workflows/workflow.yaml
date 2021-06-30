@@ -1,0 +1,34 @@
+name: Cloud PubSub
+on: [push]
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          stack-no-global: true
+          stack-version: "2.5.1"
+      - name: Cache Stack Dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml', 'stack.yaml.lock') }}-${{ hashFiles('package.yaml') }}
+          restore-keys: |
+            - ${{ runner.os }}-${{ hashFiles('stack.yaml', 'stack.yaml.lock') }}-${{ hashFiles('package.yaml') }}
+            - ${{ runner.os }}-${{ hashFiles('stack.yaml', 'stack.yaml.lock') }}
+            - ${{ runner.os }}-
+      - name: Install Dependencies
+        run: stack install --only-dependencies --test
+      - run: 'mkdir secrets && echo "$GCP_SA_KEY" > ./secrets/service_account.json'
+        shell: bash
+        env:
+          GCP_SA_KEY: ${{secrets.GCP_SA_KEY}}
+      - name: Run Tests
+        run: stack test
+        env:
+          PROJECT_ID: ${{secrets.PROJECT_ID}}
+          GOOGLE_APPLICATION_CREDENTIALS: ./secrets/service_account.json
