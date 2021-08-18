@@ -48,15 +48,15 @@ fetchAndUpdateTokenOrReset resources manager scope =
 
 getToken
   :: (HttpT.HasClientResources m, MonadLogger m, MonadIO m)
-  => Auth.Scope
-  -> m (Maybe Auth.AccessToken)
-getToken scope = do
+  => m (Maybe Auth.AccessToken)
+getToken = do
   clientResources <- HttpT.askClientResources
   case HttpT.crTargetResorces clientResources of
     HttpT.Emulator             -> return Nothing
     HttpT.Cloud cloudResources -> Just <$> do
       let manager   = HttpT.crManager clientResources
           tokenMVar = HttpT.ctrCachedTokenMVar cloudResources
+          scope = "https://www.googleapis.com/auth/pubsub"
       liftIO (MVar.takeMVar tokenMVar) >>= \case
         HttpT.NotInitialized -> do
           Logger.logWithContext ML.LevelDebug Nothing "Fetching initial token"

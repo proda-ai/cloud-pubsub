@@ -23,6 +23,7 @@ import qualified Control.Monad.Logger          as ML
 import qualified Data.HashMap.Strict           as HM
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
+import           Data.Time                      ( NominalDiffTime )
 import qualified System.Environment            as SystemEnv
 import qualified System.IO                     as SystemIO
 import           Test.Hspec                     ( pendingWith )
@@ -144,8 +145,8 @@ getProjectId :: IO (Maybe Core.ProjectId)
 getProjectId =
   fmap (Core.ProjectId . Text.pack) <$> SystemEnv.lookupEnv "PROJECT_ID"
 
-getPubSubTarget :: IO PubSub.PubSubTarget
-getPubSubTarget = do
+getPubSubTarget :: NominalDiffTime -> IO PubSub.PubSubTarget
+getPubSubTarget renewThreshold = do
   maybeEmulatorHost <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST"
   maybeSaFile       <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
   case (maybeEmulatorHost, maybeSaFile) of
@@ -153,7 +154,9 @@ getPubSubTarget = do
       return $ PubSub.EmulatorTarget $ PubSub.HostAndPort hostAndPortStr
     (Nothing, Just saFile) ->
       let authMethod = PubSub.ServiceAccountFile saFile
-      in  return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig 60 authMethod
+      in  return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig
+            renewThreshold
+            authMethod
     (_, _) ->
       error
         "Please specify either \"PUBSUB_EMULATOR_HOST\" or \
@@ -175,12 +178,15 @@ usageMessage = unlines
     \\"PUBSUB_EMULATOR_HOST\" and the \"PROJECT_ID\" environment variables."
   ]
 
-mkTestPubSubEnv :: IO TestEnv
-mkTestPubSubEnv = getProjectId >>= \case
+mkTestPubSubEnvWithRenewThreshold :: NominalDiffTime -> IO TestEnv
+mkTestPubSubEnvWithRenewThreshold renewThreshold = getProjectId >>= \case
   Nothing        -> error usageMessage
   Just projectId -> do
-    target <- getPubSubTarget
+    target <- getPubSubTarget renewThreshold
     TestEnv <$> PubSub.mkPubSubEnv projectId target
+
+mkTestPubSubEnv :: IO TestEnv
+mkTestPubSubEnv = mkTestPubSubEnvWithRenewThreshold 60
 
 data ExpectedError = ExpectedError
   deriving stock (Show, Eq)

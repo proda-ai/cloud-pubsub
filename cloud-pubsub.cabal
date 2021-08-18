@@ -96,6 +96,7 @@ test-suite cloud-pubsub-test
       Cloud.PubSub.SnapshotSpec
       Cloud.PubSub.SubscriptionSpec
       Cloud.PubSub.TestHelpers
+      Cloud.PubSub.TokenSpec
       Cloud.PubSub.TopicSnapshotsSpec
       Cloud.PubSub.TopicSpec
       Cloud.PubSub.TopicSubscriptionsSpec
