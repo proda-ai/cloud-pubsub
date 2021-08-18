@@ -1,4 +1,4 @@
-module Cloud.PubSub.TokenSpec where
+module Cloud.PubSub.Auth.TokenSpec where
 
 import qualified Cloud.PubSub.Auth.Types       as AuthT
 import           Cloud.PubSub.TestHelpers       ( mkTestPubSubEnv

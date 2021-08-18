@@ -89,6 +89,7 @@ tests:
     main: Main.hs
     other-modules:
       - Cloud.PubSub.AuthSpec
+      - Cloud.PubSub.Auth.TokenSpec
       - Cloud.PubSub.ConsumerSpec
       - Cloud.PubSub.PublisherSpec
       - Cloud.PubSub.PublisherBatchingSpec
@@ -96,7 +97,6 @@ tests:
       - Cloud.PubSub.SnapshotSpec
       - Cloud.PubSub.SubscriptionSpec
       - Cloud.PubSub.TestHelpers
-      - Cloud.PubSub.TokenSpec
       - Cloud.PubSub.TopicSnapshotsSpec
       - Cloud.PubSub.TopicSpec
       - Cloud.PubSub.TopicSubscriptionsSpec
