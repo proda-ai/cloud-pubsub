@@ -1,3 +1,5 @@
+Please note: this is an internal prototype! We intend to publish it properly at some point. For now, use at your own risk.
+
 # Google Cloud PubSub Client for Haskell (Internal Prototype Stage)
 
 This library provides a client to publish and consume Google Cloud PubSub messages through Google's [REST API](https://cloud.google.com/pubsub/docs/reference/rest).
