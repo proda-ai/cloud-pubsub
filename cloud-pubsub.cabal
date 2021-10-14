@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.3.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 
@@ -47,7 +47,15 @@ library
       Paths_cloud_pubsub
   hs-source-dirs:
       src
-  default-extensions: DefaultSignatures DeriveAnyClass DeriveGeneric DerivingStrategies DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase OverloadedStrings
+  default-extensions:
+      DefaultSignatures
+      DeriveAnyClass
+      DeriveGeneric
+      DerivingStrategies
+      DuplicateRecordFields
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-deprecations
   build-depends:
       aeson
@@ -94,7 +102,15 @@ test-suite cloud-pubsub-test
       Spec
   hs-source-dirs:
       test
-  default-extensions: DefaultSignatures DeriveAnyClass DeriveGeneric DerivingStrategies DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase OverloadedStrings
+  default-extensions:
+      DefaultSignatures
+      DeriveAnyClass
+      DeriveGeneric
+      DerivingStrategies
+      DuplicateRecordFields
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-deprecations -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
