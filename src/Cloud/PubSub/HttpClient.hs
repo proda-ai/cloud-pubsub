@@ -23,17 +23,13 @@ import qualified Network.HTTP.Conduit          as Http
 import qualified Network.HTTP.Simple           as Http
 import qualified Network.HTTP.Types.Status     as Status
 
-getToken :: AuthT.GoogleApiAuth m => m (Maybe AuthT.AccessToken)
-getToken = AuthT.getToken scope
-  where scope = "https://www.googleapis.com/auth/pubsub"
-
 addAuthHeader :: AuthT.AccessToken -> Http.Request -> Http.Request
 addAuthHeader token request =
   let headerValue = TE.encodeUtf8 $ "Bearer " <> AuthT.unwrapAccessToken token
   in  Http.addRequestHeader "authorization" headerValue request
 
 authRequest :: HttpT.PubSubHttpClientM m => Http.Request -> m Http.Request
-authRequest request = getToken <&> \case
+authRequest request = AuthT.getToken <&> \case
   Just token -> addAuthHeader token request
   Nothing    -> request
 
