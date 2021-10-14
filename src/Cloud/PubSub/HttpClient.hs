@@ -10,10 +10,14 @@ module Cloud.PubSub.HttpClient
   ) where
 
 import qualified Cloud.PubSub.Auth.Types       as AuthT
+import qualified Cloud.PubSub.Http.Retry       as Retry
 import qualified Cloud.PubSub.Http.Types       as HttpT
-import           Control.Monad.Catch            ( MonadThrow )
+import           Control.Monad.Catch            ( MonadThrow
+                                                , throwM
+                                                )
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString.Char8         as C8
 import           Data.Functor                   ( (<&>)
                                                 , void
                                                 )
@@ -59,9 +63,11 @@ authedJsonGetRequest
   => HttpT.PathQueryParams
   -> m r
 authedJsonGetRequest pathQueryParams = do
-  request  <- mkRequest "GET" pathQueryParams
-  response <- authJsonRequest request
-  return $ Http.getResponseBody response
+  request <- mkRequest "GET" pathQueryParams
+  (Retry.httpClientRetry name $ runRequest request) >>= either throwM return
+ where
+  name       = "GET: " <> HttpT.path pathQueryParams
+  runRequest = fmap decodeResponse . authJsonRequest
 
 decodeResponse
   :: Aeson.FromJSON a
@@ -70,10 +76,11 @@ decodeResponse
 decodeResponse response = if Status.statusIsSuccessful status
   then case Aeson.fromJSON body of
     Aeson.Success v -> Right v
-    Aeson.Error   e -> Left $ HttpT.DecodeError body e
+    Aeson.Error   e -> Left $ HttpT.DecodeError status body e
   else case Aeson.fromJSON body of
-    Aeson.Success (HttpT.ErrorRepsonse v) -> Left $ HttpT.ResponseError v
-    Aeson.Error   e                       -> Left $ HttpT.DecodeError body e
+    Aeson.Success (HttpT.ErrorRepsonse v) ->
+      Left $ HttpT.ResponseError status v
+    Aeson.Error e -> Left $ HttpT.DecodeError status body e
  where
   body   = Http.getResponseBody response
   status = Http.getResponseStatus response
@@ -87,11 +94,13 @@ authedJsonBodyRequest
 authedJsonBodyRequest method pathQueryParams bodyValue = do
   request <- mkRequest method pathQueryParams
   let body = RequestBodyLBS $ Aeson.encode bodyValue
-  response <-
-    authJsonRequest $ Http.setRequestBody body $ Http.setRequestResponseTimeout
-      timeout
-      request
-  return $ decodeResponse response
+      name = C8.unpack method <> ": " <> HttpT.path pathQueryParams
+  Retry.httpClientRetry name $ do
+    response <-
+      authJsonRequest
+      $ Http.setRequestBody body
+      $ Http.setRequestResponseTimeout timeout request
+    return $ decodeResponse response
  where
   minute  = 60 * 1000 * 1000
   timeout = Http.responseTimeoutMicro minute

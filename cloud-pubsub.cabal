@@ -26,6 +26,7 @@ library
       Cloud.PubSub.Consumer
       Cloud.PubSub.Core.Json
       Cloud.PubSub.Core.Types
+      Cloud.PubSub.Http.Retry
       Cloud.PubSub.Http.Types
       Cloud.PubSub.HttpClient
       Cloud.PubSub.Trans
@@ -75,6 +76,7 @@ library
     , immortal
     , monad-logger
     , mtl
+    , retry
     , stm
     , text
     , time

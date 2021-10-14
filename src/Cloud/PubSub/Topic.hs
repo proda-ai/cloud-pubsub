@@ -46,8 +46,8 @@ create
 create topicName newTopic = do
   path <- getTopicPath topicName
   HttpClient.authedJsonPutRequest path newTopic >>= \case
-    Right r                         -> return $ Right r
-    Left  e@(HttpT.ResponseError m) -> if HttpT.isAlreadyExistsError m
+    Right r                           -> return $ Right r
+    Left  e@(HttpT.ResponseError _ m) -> if HttpT.isAlreadyExistsError m
       then return $ Left TopicT.TopicAlreadyExists
       else throwM e
     Left e -> throwM e
