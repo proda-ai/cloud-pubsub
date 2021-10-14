@@ -105,7 +105,7 @@ data ModifyAckDeadlineRequest = ModifyAckDeadlineRequest
   deriving anyclass Aeson.ToJSON
 
 newtype ExpirationPolicy = ExpirationPolicy
-  { ttl :: Maybe Text }
+  { ttl :: Text }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
