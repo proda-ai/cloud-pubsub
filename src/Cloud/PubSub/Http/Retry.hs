@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module Cloud.PubSub.Http.Retry
   ( httpClientRetry
@@ -19,8 +20,8 @@ retryPolicy :: MonadIO m => Retry.RetryPolicyM m
 retryPolicy = Retry.limitRetriesByCumulativeDelay totalDelayMicros
   $ Retry.fullJitterBackoff baseDelayMicros
  where
-  baseDelayMicros  = 1000 * 50
-  totalDelayMicros = 1000 * 1000 * 5
+  baseDelayMicros  = 50_000
+  totalDelayMicros = 5_000_000
 
 retryDecider :: HttpT.RequestError -> Bool
 retryDecider = \case
