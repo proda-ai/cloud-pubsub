@@ -51,7 +51,7 @@ httpClientRetry name action = Retry.retrying retryPolicy retryCheck mkAttempt
  where
   logAttempt :: Int -> m ()
   logAttempt n =
-    $logError $ Text.pack $ mconcat ["retrying request", name, "(", show n, ")"]
+    $logError $ Text.pack $ mconcat ["retrying request ", name, " (", show n, ")"]
 
   mkAttempt :: Retry.RetryStatus -> m (Either HttpT.RequestError a)
   mkAttempt rs = do
