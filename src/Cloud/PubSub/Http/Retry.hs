@@ -28,11 +28,13 @@ retryDecider = \case
   HttpT.ResponseError status _ -> status `elem` retryStatuses
   HttpT.DecodeError status _ _ -> status `elem` retryStatuses
  where
+  -- Based on what is described to be safe to retry
+  -- https://cloud.google.com/pubsub/docs/reference/error-codes
   retryStatuses =
-    [ Status.requestTimeout408
+    [ Status.badGateway502
+    , Status.internalServerError500
     , Status.tooManyRequests429
     , Status.serviceUnavailable503
-    , Status.gatewayTimeout504
     ]
 
 retryCheck
