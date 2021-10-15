@@ -25,8 +25,9 @@ retryPolicy = Retry.limitRetriesByCumulativeDelay totalDelayMicros
 
 retryDecider :: HttpT.RequestError -> Bool
 retryDecider = \case
-  HttpT.ResponseError status _ -> status `elem` retryStatuses
-  HttpT.DecodeError status _ _ -> status `elem` retryStatuses
+  HttpT.ErrorResponseError status _ -> status `elem` retryStatuses
+  HttpT.DecodeError        _      _ -> False
+  HttpT.OtherError         status _ -> status `elem` retryStatuses
  where
   -- Based on what is described to be safe to retry
   -- https://cloud.google.com/pubsub/docs/reference/error-codes
@@ -52,8 +53,8 @@ httpClientRetry
 httpClientRetry name action = Retry.retrying retryPolicy retryCheck mkAttempt
  where
   logAttempt :: Int -> m ()
-  logAttempt n =
-    $logError $ Text.pack $ mconcat ["retrying request ", name, " (", show n, ")"]
+  logAttempt n = $logError $ Text.pack $ mconcat
+    ["retrying request ", name, " (", show n, ")"]
 
   mkAttempt :: Retry.RetryStatus -> m (Either HttpT.RequestError a)
   mkAttempt rs = do

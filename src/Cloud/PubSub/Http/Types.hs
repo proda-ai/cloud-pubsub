@@ -117,8 +117,9 @@ newtype ErrorRepsonse = ErrorRepsonse
   deriving stock (Show, Eq, Generic)
   deriving anyclass Aeson.FromJSON
 
-data RequestError = ResponseError Status ErrorMessage
-                  | DecodeError Status Aeson.Value String
+data RequestError = ErrorResponseError Status ErrorMessage
+                  | DecodeError Aeson.Value String
+                  | OtherError Status String
                     deriving stock (Show, Eq)
 
 instance Exception RequestError

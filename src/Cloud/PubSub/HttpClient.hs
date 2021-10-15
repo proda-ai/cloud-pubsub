@@ -76,11 +76,11 @@ decodeResponse
 decodeResponse response = if Status.statusIsSuccessful status
   then case Aeson.fromJSON body of
     Aeson.Success v -> Right v
-    Aeson.Error   e -> Left $ HttpT.DecodeError status body e
+    Aeson.Error   e -> Left $ HttpT.DecodeError body e
   else case Aeson.fromJSON body of
     Aeson.Success (HttpT.ErrorRepsonse v) ->
-      Left $ HttpT.ResponseError status v
-    Aeson.Error e -> Left $ HttpT.DecodeError status body e
+      Left $ HttpT.ErrorResponseError status v
+    Aeson.Error e -> Left $ HttpT.OtherError status e
  where
   body   = Http.getResponseBody response
   status = Http.getResponseStatus response
