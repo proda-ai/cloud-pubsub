@@ -63,8 +63,8 @@ create schemaName schemaType definition = do
         ]
   pathQueryParams <- (`HttpT.PathQueryParams` Just params) <$> getSchemaRootStr
   HttpClient.authedJsonPostRequest pathQueryParams schema >>= \case
-    Right r                         -> return $ Right r
-    Left  e@(HttpT.ResponseError m) -> if HttpT.isAlreadyExistsError m
+    Right r -> return $ Right r
+    Left e@(HttpT.ErrorResponseError _ m) -> if HttpT.isAlreadyExistsError m
       then return $ Left SchemaT.SchemaAlreadyExists
       else throwM e
     Left e -> throwM e
@@ -118,7 +118,7 @@ validate schema = do
     Right v -> if v == emptyObject
       then return Nothing
       else error "unexpected validation response"
-    Left e@(HttpT.ResponseError m) -> if HttpT.isInvalidArgumentError m
+    Left e@(HttpT.ErrorResponseError _ m) -> if HttpT.isInvalidArgumentError m
       then return $ Just $ SchemaT.SchemaValidationError $ HttpT.message m
       else throwM e
     Left e -> throwM e
@@ -134,7 +134,7 @@ validateMessage vm = do
     Right v -> if v == emptyObject
       then return Nothing
       else error "unexpected validation response"
-    Left e@(HttpT.ResponseError m) -> if HttpT.isInvalidArgumentError m
+    Left e@(HttpT.ErrorResponseError _ m) -> if HttpT.isInvalidArgumentError m
       then return $ Just $ SchemaT.SchemaValidationError $ HttpT.message m
       else throwM e
     Left e -> throwM e

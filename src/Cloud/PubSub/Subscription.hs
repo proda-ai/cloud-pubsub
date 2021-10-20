@@ -56,8 +56,8 @@ create
 create subName sub = do
   path <- getSubPath subName
   HttpClient.authedJsonPutRequest path sub >>= \case
-    Right r                         -> return $ Right r
-    Left  e@(HttpT.ResponseError m) -> if HttpT.isAlreadyExistsError m
+    Right r -> return $ Right r
+    Left e@(HttpT.ErrorResponseError _ m) -> if HttpT.isAlreadyExistsError m
       then return $ Left SubscriptionT.SubscriptionAlreadyExists
       else throwM e
     Left e -> throwM e

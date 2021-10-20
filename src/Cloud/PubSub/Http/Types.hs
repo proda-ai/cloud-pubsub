@@ -22,7 +22,6 @@ module Cloud.PubSub.Http.Types
   , simplePath
   ) where
 
-import qualified Control.Monad.Logger          as ML
 import qualified Cloud.PubSub.Auth.Types       as AuthT
 import           Cloud.PubSub.Core.Types        ( ProjectId )
 import           Control.Concurrent.MVar        ( MVar )
@@ -30,6 +29,7 @@ import           Control.Monad.Catch            ( Exception
                                                 , MonadThrow
                                                 )
 import           Control.Monad.IO.Class         ( MonadIO )
+import qualified Control.Monad.Logger          as ML
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Char8         as C8
@@ -38,6 +38,7 @@ import qualified Data.Text.Encoding            as TE
 import           Data.Time                      ( NominalDiffTime )
 import           GHC.Generics                   ( Generic )
 import           Network.HTTP.Conduit           ( Manager )
+import           Network.HTTP.Types.Status      ( Status )
 
 data TokenContainer = Available AuthT.CachedToken
                     | NotInitialized
@@ -116,8 +117,9 @@ newtype ErrorRepsonse = ErrorRepsonse
   deriving stock (Show, Eq, Generic)
   deriving anyclass Aeson.FromJSON
 
-data RequestError = ResponseError ErrorMessage
+data RequestError = ErrorResponseError Status ErrorMessage
                   | DecodeError Aeson.Value String
+                  | OtherError Status String
                     deriving stock (Show, Eq)
 
 instance Exception RequestError
