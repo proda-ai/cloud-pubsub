@@ -10,7 +10,7 @@ import qualified Cloud.PubSub.Http.Types       as HttpT
 import           Control.Monad                  ( when )
 import           Control.Monad.IO.Class         ( MonadIO )
 import           Control.Monad.Logger           ( MonadLogger
-                                                , logError
+                                                , logInfo
                                                 )
 import qualified Control.Retry                 as Retry
 import qualified Data.Text                     as Text
@@ -53,7 +53,7 @@ httpClientRetry
 httpClientRetry name action = Retry.retrying retryPolicy retryCheck mkAttempt
  where
   logAttempt :: Int -> m ()
-  logAttempt n = $logError $ Text.pack $ mconcat
+  logAttempt n = $logInfo $ Text.pack $ mconcat
     ["retrying request ", name, " (", show n, ")"]
 
   mkAttempt :: Retry.RetryStatus -> m (Either HttpT.RequestError a)
