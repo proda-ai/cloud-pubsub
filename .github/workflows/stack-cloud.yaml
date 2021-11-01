@@ -1,4 +1,4 @@
-name: Cloud PubSub
+name: Stack Hosted Cloud PubSub Test
 on: [push]
 jobs:
   build-and-test:
