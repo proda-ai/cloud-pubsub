@@ -29,7 +29,7 @@ jobs:
           nix-store -qR --include-outputs $(nix-instantiate shell.nix) | cachix push proda-ai-cloud-pubsub
         env:
           CACHIX_AUTH_TOKEN: ${{secrets.CACHIX_AUTH_TOKEN}}
-      - name: Nix build with tests
+      - name: Build tests with Nix
         run: nix-build -A cloud-pubsub.components.tests.cloud-pubsub-test -o ./results/cloud-pubsub-test
       - name: Run tests
-        run: ./results/cloud-pubsub-test/bin/cloud-pubsub-test
+        run: nix-shell --command "./results/cloud-pubsub-test/bin/cloud-pubsub-test"
