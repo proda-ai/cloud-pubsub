@@ -30,6 +30,6 @@ jobs:
         env:
           CACHIX_AUTH_TOKEN: ${{secrets.CACHIX_AUTH_TOKEN}}
       - name: Nix build with tests
-        run: nix-build --no-out-link -A cloud-pubsub.components.tests.cloud-pubsub-test
+        run: nix-build -A cloud-pubsub.components.tests.cloud-pubsub-test -o ./results/cloud-pubsub-test
       - name: Run tests
-        run: nix-shell --command "cabal test"
+        run: ./results/cloud-pubsub-test/bin/cloud-pubsub-test
