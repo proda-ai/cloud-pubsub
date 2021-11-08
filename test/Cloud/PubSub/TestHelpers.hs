@@ -38,9 +38,6 @@ isEmulated (TestEnv (PubSubTrans.PubSubEnv cr)) =
     HttpT.Emulator -> True
     HttpT.Cloud _  -> False
 
-testServiceAccountPath :: FilePath
-testServiceAccountPath = "./secrets/service_account.json"
-
 testLabels :: HM.HashMap Text Text
 testLabels = HM.fromList [("environment", "test")]
 

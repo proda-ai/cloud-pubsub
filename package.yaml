@@ -116,6 +116,7 @@ tests:
       - cloud-pubsub
       - exceptions
       - hspec
+      # See https://github.com/input-output-hk/haskell.nix/issues/231
       - hspec-discover
       - http-client
       - http-client-tls

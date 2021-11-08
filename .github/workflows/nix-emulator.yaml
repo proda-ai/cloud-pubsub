@@ -1,0 +1,35 @@
+# We run the nix workflow against the emulator as the tests, as they are
+# currently written, assumes that there are no other concurrent PubSub 
+# operations while they are run
+name: Nix Cloud PubSub Emulator Test
+on: [push]
+jobs:
+  nix-build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Start PubSub Emulator
+        run: |
+          docker-compose up --build -d pubsub-emulator
+      - uses: cachix/install-nix-action@v13
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+            substituters = https://hydra.iohk.io https://cache.nixos.org/
+      - uses: cachix/cachix-action@v10
+        with:
+          name: proda-ai-cloud-pubsub
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          extraPullNames: nix-community
+      - name: Push Nix Dependencies
+        run: |
+          nix-build shell.nix
+          nix-store -qR --include-outputs $(nix-instantiate shell.nix) | cachix push proda-ai-cloud-pubsub
+        env:
+          CACHIX_AUTH_TOKEN: ${{secrets.CACHIX_AUTH_TOKEN}}
+      - name: Build tests with Nix
+        run: nix-build -A cloud-pubsub.components.tests.cloud-pubsub-test -o ./results/cloud-pubsub-test
+      - name: Run tests
+        run: nix-shell --command "./results/cloud-pubsub-test/bin/cloud-pubsub-test"
