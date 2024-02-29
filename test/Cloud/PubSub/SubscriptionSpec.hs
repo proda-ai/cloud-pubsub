@@ -5,6 +5,9 @@ import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Subscription     as Subscription
 import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
+import qualified Cloud.PubSub.Subscription.Types
+                                               as SubscriptionT.Subscription
+                                                ( Subscription(..) )
 import           Cloud.PubSub.TestHelpers       ( TestEnv
                                                 , mkTestPubSubEnv
                                                 , runTest
@@ -30,11 +33,11 @@ testMessage = Topic.PublishPubsubMessage { ppmOrderingKey = Just "constant-key"
 resetPublishConfigAttributes
   :: SubscriptionT.Subscription -> SubscriptionT.Subscription
 resetPublishConfigAttributes sub = sub
-  { SubscriptionT.pushConfig = Just pushConfig
+  { SubscriptionT.Subscription.pushConfig = Just pushConfig
   }
  where
   pushConfig =
-    (fromJust $ SubscriptionT.pushConfig (sub :: SubscriptionT.Subscription))
+    (fromJust sub.pushConfig)
       { SubscriptionT.attributes = Nothing
       }
 
@@ -57,8 +60,8 @@ subscriptionUpdateTest =
     let
       subPatch = SubscriptionT.SubscriptionPatch
         { subscription = initialSub
-          { SubscriptionT.labels = Just
-                                     $ HM.fromList [("patched", "successful")]
+          { SubscriptionT.Subscription.labels =
+              Just $ HM.fromList [("patched", "successful")]
           }
         , updateMask   = Core.UpdateMask "labels"
         }

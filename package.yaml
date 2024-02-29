@@ -22,6 +22,7 @@ default-extensions:
   - DuplicateRecordFields
   - GeneralizedNewtypeDeriving
   - LambdaCase
+  - OverloadedRecordDot
   - OverloadedStrings
 
 ghc-options:

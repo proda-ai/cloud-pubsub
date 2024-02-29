@@ -25,10 +25,8 @@ fetchAndUpdateToken resources manager scope = do
   let serviceAccount = HttpT.ctrServiceAccount resources
   tokenResponse <- Auth.fetchToken manager serviceAccount scope
   now           <- Time.getCurrentTime
-  let accessToken =
-        Auth.accessToken (tokenResponse :: Auth.AccessTokenResponse)
-      expiresIn   = Auth.expiresIn (tokenResponse :: Auth.AccessTokenResponse)
-      expiresAt   = Time.addUTCTime expiresIn now
+  let accessToken = tokenResponse.accessToken
+      expiresAt   = Time.addUTCTime tokenResponse.expiresIn now
       cachedToken = Auth.CachedToken accessToken expiresAt
   MVar.putMVar (HttpT.ctrCachedTokenMVar resources)
                (HttpT.Available cachedToken)
@@ -64,7 +62,7 @@ getToken = do
         HttpT.Available cachedToken -> do
           now <- liftIO Time.getCurrentTime
           let renewThreshold = HttpT.ctrRenewThreshold cloudResources
-          if Time.diffUTCTime (Auth.expiresAt cachedToken) now < renewThreshold
+          if Time.diffUTCTime cachedToken.expiresAt now < renewThreshold
             then do
               Logger.logWithContext ML.LevelDebug
                                     Nothing
@@ -73,4 +71,4 @@ getToken = do
             else do
               liftIO $ MVar.putMVar tokenMVar (HttpT.Available cachedToken)
               Logger.logWithContext ML.LevelDebug Nothing "Using cached token"
-              return $ Auth.accessToken (cachedToken :: Auth.CachedToken)
+              return cachedToken.accessToken

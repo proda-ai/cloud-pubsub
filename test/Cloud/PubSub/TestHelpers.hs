@@ -9,11 +9,18 @@ import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Logger           as Logger
 import qualified Cloud.PubSub.Snapshot         as Snapshot
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
+import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT.NewSnapshot
+                                                ( NewSnapshot(..) )
 import qualified Cloud.PubSub.Subscription     as Subscription
 import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
+import qualified Cloud.PubSub.Subscription.Types
+                                               as SubscriptionT.NewSubscription
+                                                ( NewSubscription(..) )
 import qualified Cloud.PubSub.Topic            as Topic
 import qualified Cloud.PubSub.Topic.Types      as TopicT
+import qualified Cloud.PubSub.Topic.Types      as TopicT.NewTopic
+                                                ( NewTopic(..) )
 import qualified Cloud.PubSub.Trans            as PubSubTrans
 import           Control.Monad.Catch            ( Exception
                                                 , MonadMask
@@ -29,7 +36,7 @@ import qualified System.IO                     as SystemIO
 import           Test.Hspec                     ( pendingWith )
 
 newtype TestEnv = TestEnv
-  { pubSubEnv  :: PubSubTrans.PubSubEnv
+  { pubSubEnv :: PubSubTrans.PubSubEnv
   }
 
 isEmulated :: TestEnv -> Bool
@@ -48,7 +55,8 @@ createTestTopic topicName = Topic.create topicName newTopic >>= \case
     error $ "unexpected existing topic " <> show topicName
  where
   newTopic :: TopicT.NewTopic
-  newTopic = TopicT.minimalNewTopic { TopicT.labels = Just testLabels }
+  newTopic = TopicT.minimalNewTopic { TopicT.NewTopic.labels = Just testLabels
+                                    }
 
 withTestTopic
   :: (HttpT.PubSubHttpClientM m, MonadMask m) => TopicName -> m a -> m a
@@ -64,7 +72,7 @@ createTestSub subName topicName = do
   let qualifiedTopic = Core.qualifyTopicName projectId topicName
       newSub :: SubscriptionT.NewSubscription
       newSub = (SubscriptionT.minimalNewSubscription qualifiedTopic)
-        { SubscriptionT.labels = Just testLabels
+        { SubscriptionT.NewSubscription.labels = Just testLabels
         }
   Subscription.create subName newSub >>= \case
     Right _ -> return ()
@@ -92,7 +100,7 @@ createSnapshot snapshotName subName = do
   let qualifiedSub = SubscriptionT.qualifySubName projectId subName
       newSnap :: SnapshotT.NewSnapshot
       newSnap = (SnapshotT.minimalNewSnapshot qualifiedSub)
-        { SnapshotT.labels = Just testLabels
+        { SnapshotT.NewSnapshot.labels = Just testLabels
         }
   Snapshot.create snapshotName newSnap >>= \case
     Right _ -> return ()
@@ -151,9 +159,9 @@ getPubSubTarget renewThreshold = do
       return $ PubSub.EmulatorTarget $ PubSub.HostAndPort hostAndPortStr
     (Nothing, Just saFile) ->
       let authMethod = PubSub.ServiceAccountFile saFile
-      in  return $ PubSub.CloudServiceTarget $ PubSub.CloudConfig
-            renewThreshold
-            authMethod
+      in  return
+          $ PubSub.CloudServiceTarget
+          $ PubSub.CloudConfig renewThreshold authMethod
     (_, _) ->
       error
         "Please specify either \"PUBSUB_EMULATOR_HOST\" or \
