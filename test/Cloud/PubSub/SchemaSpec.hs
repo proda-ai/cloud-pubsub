@@ -121,7 +121,7 @@ invalidSchemaValidateTest = runTestIfNotEmulator $ do
   let schema = SchemaT.Schema schemaName SchemaT.Avro (Just badSchema)
   result <- Schema.validate schema
   let expected = SchemaT.SchemaValidationError
-        "Invalid schema message: Could not parse schema: EOF reached."
+        "AVRO schema definition is not valid: Tried to parse invalid JSON."
   liftIO $ result `shouldBe` Just expected
  where
   schemaName = "invalid-schema-valdiate-test"
@@ -157,8 +157,8 @@ validateInvalidMessageTest =
         let
           expected =
             SchemaT.SchemaValidationError
-              "Invalid schema message: Unable to parse message: Incorrect \
-              \token in the stream. Expected: Integer, found String."
+              "Invalid data in message: JSON object with type string does not \
+              \match schema which expected number_integer."
         liftIO $ result `shouldBe` Just expected
   where schemaName = "valdiate-invalid-message-test"
 
