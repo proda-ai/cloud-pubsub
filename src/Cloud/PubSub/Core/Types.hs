@@ -12,14 +12,16 @@ module Cloud.PubSub.Core.Types
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Base64        as Base64
+import           Data.HashMap.Strict            ( HashMap )
 import           Data.String                    ( IsString )
 import           Data.Text                      ( Text )
 import qualified Data.Text.Encoding            as TE
 import           GHC.Generics                   ( Generic )
 
 data Message = Message
-  { key   :: Maybe Text
-  , value :: ByteString
+  { key        :: Maybe Text
+  , value      :: ByteString
+  , attributes :: Maybe (HashMap Text Text)
   }
   deriving (Show, Eq)
 

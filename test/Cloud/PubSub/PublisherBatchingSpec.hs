@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLists #-}
+
 module Cloud.PubSub.PublisherBatchingSpec where
 
 import qualified Cloud.PubSub.Core.Types       as CoreT
@@ -96,7 +98,7 @@ mockPublishMessage publisherStateVar topicName mesages = do
 
 mkMessages :: [Int] -> [CoreT.Message]
 mkMessages xs =
-  [ CoreT.Message (Just "constant-key") (C8.pack $ show x) | x <- xs ]
+  [ CoreT.Message (Just "constant-key") (C8.pack $ show x) (Just [("attribute-key", "attribute-value")]) | x <- xs ]
 
 mkPublisherConfigWithBatchSize :: Int -> PublisherT.PublisherConfig
 mkPublisherConfigWithBatchSize mbs =
@@ -234,7 +236,7 @@ errorPropagationTest = do
       Left  e -> liftIO $ e `shouldBe` ExpectedError
  where
   testTopic       = "error-propagation-test"
-  messages        = [CoreT.Message (Just "constant-key") "1"]
+  messages        = [CoreT.Message (Just "constant-key") "1" (Just [("attribute-key", "attribute-value")])]
   publisherConfig = mkPublisherConfigWithBatchSize 5
 
 spec :: Spec

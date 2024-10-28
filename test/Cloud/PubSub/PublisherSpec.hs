@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLists #-}
+
 module Cloud.PubSub.PublisherSpec where
 
 import qualified Cloud.PubSub.Core.Types       as CoreT
@@ -40,7 +42,7 @@ publishMessageBatchTest :: TestEnv -> IO ()
 publishMessageBatchTest = runTest $ withTestTopic topic $ do
   let messageCount = 10
       messages =
-        [ CoreT.Message (Just "constant-key") (C8.pack $ show (x :: Int))
+        [ CoreT.Message (Just "constant-key") (C8.pack $ show (x :: Int)) (Just [("attribute-key", "attribute-value")])
         | x <- [1 .. messageCount]
         ]
   ids <- Publisher.publishSync topic messages
@@ -49,7 +51,7 @@ publishMessageBatchTest = runTest $ withTestTopic topic $ do
 
 publishAndConsumeTest :: TestEnv -> IO ()
 publishAndConsumeTest = runTest $ withTestTopic topic $ do
-  let message           = CoreT.Message (Just "constant-key") "hello"
+  let message           = CoreT.Message (Just "constant-key") "hello" (Just [("attribute-key", "attribute-value")])
       publishedMessages = [message]
   withTestSub topic subName $ do
     _                <- Publisher.publishSync topic publishedMessages
