@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLists #-}
+
 module Cloud.PubSub.ConsumerSpec where
 
 import qualified Cloud.PubSub.Consumer         as Consumer
@@ -25,8 +27,9 @@ publishAndConsumeTest testEnv = flip runTest testEnv $ do
     subName   = "test"
     key       = "constant-key"
     value     = "some data"
+    attributes = Just [("attribute-key", "attribute-value")]
     message =
-      Topic.PublishPubsubMessage { ppmOrderingKey = Just key, ppmData = value }
+      Topic.PublishPubsubMessage { ppmOrderingKey = Just key, ppmData = value, ppmAttributes = attributes }
     consumerConfig =
       Consumer.ConsumerConfig { pollBatchSize = 50, pollingInterval = 0.1 }
 
@@ -42,8 +45,9 @@ publishAndConsumeTest testEnv = flip runTest testEnv $ do
       workerId <- Immortal.create $ const action
       received <- MVar.takeMVar receivedMVar
       Immortal.stop workerId
-      SubscriptionT.pmOrderingKey received `shouldSatisfy` (== Just key)
-      SubscriptionT.pmData received `shouldSatisfy` (== value)
+      SubscriptionT.pmOrderingKey received `shouldBe` Just key
+      SubscriptionT.pmData received `shouldBe` value
+      SubscriptionT.pmAttributes received `shouldBe` attributes
 
 spec :: Spec
 spec = before mkTestPubSubEnv $ do

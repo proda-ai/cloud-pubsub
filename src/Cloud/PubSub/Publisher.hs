@@ -112,6 +112,7 @@ extractMessage :: Message -> TopicT.PublishPubsubMessage
 extractMessage m = TopicT.PublishPubsubMessage
   { ppmOrderingKey = key m
   , ppmData        = Base64DataString $ value m
+  , ppmAttributes  = attributes m
   }
 
 mkPublisherImpl

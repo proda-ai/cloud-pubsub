@@ -15,6 +15,7 @@ import           GHC.Generics                   ( Generic )
 data PublishPubsubMessage = PublishPubsubMessage
   { ppmOrderingKey :: Maybe Text
   , ppmData        :: Base64DataString
+  , ppmAttributes  :: Maybe (HashMap Text Text)
   }
   deriving stock (Show, Eq, Generic)
 

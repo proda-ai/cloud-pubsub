@@ -124,6 +124,7 @@ convertMessage :: SubscriptionT.PubsubMessage -> Message
 convertMessage m = Message
   { key   = SubscriptionT.pmOrderingKey m
   , value = Core.unwrapBase64DataString (SubscriptionT.pmData m)
+  , attributes = SubscriptionT.pmAttributes m
   }
 
 logger :: Logger.LoggerFn

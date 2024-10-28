@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLists #-}
+
 module Cloud.PubSub.SubscriptionSpec where
 
 import qualified Cloud.PubSub.Core.Types       as Core
@@ -25,6 +27,7 @@ import           Test.Hspec
 testMessage :: Topic.PublishPubsubMessage
 testMessage = Topic.PublishPubsubMessage { ppmOrderingKey = Just "constant-key"
                                          , ppmData        = "some data"
+                                         , ppmAttributes  = Just [("attribute-key", "attribute-value")]
                                          }
 
 resetPublishConfigAttributes

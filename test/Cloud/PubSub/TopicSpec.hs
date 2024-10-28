@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLists #-}
+
 module Cloud.PubSub.TopicSpec where
 
 import qualified Cloud.PubSub.Core.Types       as Core
@@ -51,6 +53,7 @@ topicPublishTest = runTest $ withTestTopic topic $ do
   topic   = "topic-publish-test"
   message = TopicT.PublishPubsubMessage { ppmOrderingKey = Just "constant-key"
                                         , ppmData        = "some data"
+                                        , ppmAttributes  = Just [("attribute-key", "attribute-value")]
                                         }
 
 topicListTest :: TestEnv -> IO ()
