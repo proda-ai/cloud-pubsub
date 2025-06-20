@@ -20,6 +20,7 @@ import qualified Cloud.PubSub.HttpClient       as HttpClient
 import qualified Cloud.PubSub.Subscription.Types
                                                as SubscriptionT
 import           Control.Monad.Catch            ( throwM )
+import           Data.Maybe                     ( fromMaybe )
 import qualified Data.Text                     as Text
 
 getSubStr
@@ -107,8 +108,8 @@ pull
 pull subName batchSize = do
   path <- getSubOpPath subName "pull"
   let body = SubscriptionT.PullRequest batchSize
-  SubscriptionT.receivedMessages
-    <$> (HttpClient.authedJsonPostRequest path body >>= either throwM return)
+  response <- HttpClient.authedJsonPostRequest path body >>= either throwM return
+  pure $ fromMaybe [] $ SubscriptionT.receivedMessages response
 
 acknowledge
   :: HttpT.PubSubHttpClientM m
