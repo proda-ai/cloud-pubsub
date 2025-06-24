@@ -8,8 +8,8 @@ hsPkgs.shellFor {
   exactDeps = true;
   buildInputs = [ pkgs.docker-compose ];
   tools = {
-    cabal = "3.4.0.0";
-    hpack = "0.34.4";
+    cabal = "3.12.1.0";
+    hpack = "0.37.0";
   };
 
   shellHook = ''

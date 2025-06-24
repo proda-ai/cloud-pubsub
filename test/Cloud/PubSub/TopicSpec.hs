@@ -12,6 +12,8 @@ import           Cloud.PubSub.TestHelpers       ( TestEnv
                                                 )
 import qualified Cloud.PubSub.Topic            as Topic
 import qualified Cloud.PubSub.Topic.Types      as TopicT
+import qualified Cloud.PubSub.Topic.Types      as TopicT.Topic
+                                                ( Topic(..) )
 import           Control.Monad.IO.Class         ( liftIO )
 import           Data.Functor                   ( void )
 import qualified Data.HashMap.Strict           as HM
@@ -31,7 +33,7 @@ topicUpdateTest = runTestIfNotEmulator $ withTestTopic topic $ do
   initialTopic <- Topic.get topic
   let topicPatch = TopicT.TopicPatch
         { topic      = initialTopic
-          { TopicT.labels = Just $ HM.fromList [("patched", "successful")]
+          { TopicT.Topic.labels = Just $ HM.fromList [("patched", "successful")]
           }
         , updateMask = Core.UpdateMask "labels"
         }

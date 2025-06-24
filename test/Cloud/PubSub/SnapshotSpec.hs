@@ -4,6 +4,8 @@ import           Cloud.PubSub.Core.Types        ( UpdateMask(..) )
 import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Snapshot         as Snapshot
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
+import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT.Snapshot
+                                                ( Snapshot(..) )
 import           Cloud.PubSub.TestHelpers       ( TestEnv
                                                 , mkTestPubSubEnv
                                                 , runTest
@@ -38,8 +40,8 @@ snapshotUpdateTest =
         let
           snapshotPatch = SnapshotT.SnapshotPatch
             { snapshot   = initialSnap
-              { SnapshotT.labels = Just
-                                     $ HM.fromList [("patched", "successful")]
+              { SnapshotT.Snapshot.labels =
+                  Just $ HM.fromList [("patched", "successful")]
               }
             , updateMask = UpdateMask "labels"
             }

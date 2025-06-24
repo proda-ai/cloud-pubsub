@@ -2,15 +2,15 @@ let
   sources = {
     haskellNix =
       (builtins.fetchTarball {
-        url = "https://github.com/input-output-hk/haskell.nix/archive/6cbb6390ae49b6d7983d00f3db7d21ba078f2c96.tar.gz";
-        sha256 = "0qj82l72qpnzrxc8rbfklk038ybgfb1s56rnmigjnx3s417a37iv";
+        url = "https://github.com/input-output-hk/haskell.nix/archive/256e8da232ea566d08575f57b339d0a1f1e29f2d.tar.gz";
+        sha256 = "0wsbjgrkba6rdyz99jyr4rwgwgck7ayc0ja1ghmmbp6l6jg34p21";
       });
   };
 
   haskellNix = import sources.haskellNix { };
 
   pkgs = import
-    haskellNix.sources.nixpkgs-2105
+    haskellNix.sources.nixpkgs-2405
     haskellNix.nixpkgsArgs;
 
   out = pkgs.haskell-nix.project
