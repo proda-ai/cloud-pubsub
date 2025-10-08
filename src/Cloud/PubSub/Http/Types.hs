@@ -44,7 +44,7 @@ data TokenContainer = Available AuthT.CachedToken
                     | NotInitialized
 
 data CloudTargetResources = CloudTargetResources
-  { ctrServiceAccount  :: AuthT.ServiceAccount
+  { ctrTokenSource     :: AuthT.TokenSource
   , ctrCachedTokenMVar :: MVar TokenContainer
   , ctrRenewThreshold  :: NominalDiffTime
   }

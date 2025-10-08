@@ -1,6 +1,7 @@
 module Cloud.PubSub.Auth
   ( fetchToken
   , readServiceAccountFile
+  , fetchMetadataToken
   ) where
 
 import qualified Cloud.PubSub.Auth.Types       as AuthT
@@ -15,6 +16,7 @@ import qualified Data.ByteString.Base64.URL    as Base64
 import qualified Data.ByteString.Lazy          as LBS
 import           Data.Functor                   ( (<&>) )
 import qualified Data.Text                     as Text
+import qualified Data.Text.Encoding            as TE
 import qualified Data.Time                     as Time
 import qualified Network.HTTP.Client.Conduit   as HttpClientC
 import qualified Network.HTTP.Simple           as HTTP
@@ -52,7 +54,7 @@ fetchToken
   -> AuthT.Scope
   -> m AuthT.AccessTokenResponse
 fetchToken manager serviceAccount scope = liftIO $ do
-  -- implements the flow described here, 
+  -- implements the flow described here,
   -- https://developers.google.com/identity/protocols/oauth2/service-account
   now <- Time.getCurrentTime
   let oneHour = 3600
@@ -84,3 +86,24 @@ fetchToken manager serviceAccount scope = liftIO $ do
     [ ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
     , ("assertion" , token)
     ]
+
+fetchMetadataToken
+  :: MonadIO m
+  => HttpClientC.Manager
+  -> AuthT.Scope
+  -> m AuthT.AccessTokenResponse
+fetchMetadataToken manager scope = liftIO $ do
+  -- Implements the metadata server flow:
+  -- https://cloud.google.com/docs/authentication/rest#metadata-server
+  -- Pass requested OAuth scope via query string. The client will URL-encode values.
+  let metadataTokenUrl =
+        "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+      query = [("scopes", Just (TE.encodeUtf8 (AuthT.unwrapScope scope)))]
+  request <-
+    HTTP.parseRequest ("GET " <> metadataTokenUrl)
+      <&> ( HTTP.setRequestQueryString query
+          . HTTP.addRequestHeader "Metadata-Flavor" "Google"
+          . HTTP.setRequestManager manager
+          )
+  response <- HTTP.httpJSON request
+  return $ HTTP.getResponseBody response
