@@ -74,7 +74,7 @@ instance Aeson.FromJSON ReceivedMessage where
   parseJSON = Aeson.genericParseJSON Json.options
 
 newtype PullResponse = PullResponse
-  { receivedMessages :: [ReceivedMessage]
+  { receivedMessages :: Maybe [ReceivedMessage]
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass Aeson.FromJSON
