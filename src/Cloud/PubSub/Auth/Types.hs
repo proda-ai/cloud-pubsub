@@ -6,6 +6,7 @@ module Cloud.PubSub.Auth.Types
   , PrivateKeyId(..)
   , Scope(..)
   , ServiceAccount(..)
+  , TokenSource(..)
   , TokenClaims(..)
   , UnixEpochSeconds(..)
   , X509PrivateKey(..)
@@ -43,7 +44,7 @@ instance Aeson.FromJSON X509PrivateKey where
 
 data ServiceAccount = ServiceAccount
   { saType                    :: Text
-  -- Given that service accounts can be used acrooss projects 
+  -- Given that service accounts can be used acrooss projects
   -- "project_id" is ignored
   , saPrivateKeyId            :: PrivateKeyId
   , saPrivateKey              :: X509PrivateKey
@@ -54,12 +55,15 @@ data ServiceAccount = ServiceAccount
   , saAuthProviderX509CertUrl :: Text
   , saClientX509CertUrl       :: Text
   }
-  deriving stock Generic
+  deriving stock (Generic)
 
 instance Aeson.FromJSON ServiceAccount where
   parseJSON = Aeson.genericParseJSON $ Aeson.defaultOptions
     { Aeson.fieldLabelModifier = Aeson.camelTo2 '_' . drop 2
     }
+
+data TokenSource = FromServiceAccount ServiceAccount
+                 | FromMetadataServer
 
 newtype AccessToken = AccessToken
   { unwrapAccessToken :: Text

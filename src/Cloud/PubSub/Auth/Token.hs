@@ -22,8 +22,12 @@ fetchAndUpdateToken
   -> Auth.Scope
   -> IO Auth.AccessToken
 fetchAndUpdateToken resources manager scope = do
-  let serviceAccount = HttpT.ctrServiceAccount resources
-  tokenResponse <- Auth.fetchToken manager serviceAccount scope
+  let tokenSource = HttpT.ctrTokenSource resources
+  tokenResponse <- case tokenSource of
+    Auth.FromServiceAccount serviceAccount ->
+      Auth.fetchToken manager serviceAccount scope
+    Auth.FromMetadataServer ->
+      Auth.fetchMetadataToken manager scope
   now           <- Time.getCurrentTime
   let accessToken = tokenResponse.accessToken
       expiresAt   = Time.addUTCTime tokenResponse.expiresIn now
