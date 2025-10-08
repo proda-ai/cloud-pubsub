@@ -34,6 +34,7 @@ data CloudConfig = CloudConfig
   deriving (Show, Eq)
 
 data PubSubTarget = EmulatorTarget HostAndPort
+                  | ImplicitTarget
                   | CloudServiceTarget CloudConfig
                     deriving (Show,Eq)
 
@@ -43,6 +44,8 @@ mkClientResources projectId target = do
     EmulatorTarget hostAndPort -> do
       let hostAndPortUrl = "http://" <> unwrapHostAndPort hostAndPort
       return (hostAndPortUrl, Emulator)
+    ImplictTarget ->
+      return ("https://pubsub.googleapis.com", Implicit)
     CloudServiceTarget (CloudConfig threshold (ServiceAccountFile saFile)) ->
       do
         resources <-

@@ -50,6 +50,7 @@ data CloudTargetResources = CloudTargetResources
   }
 
 data TargetResources = Emulator
+                     | Implicit
                      | Cloud CloudTargetResources
 
 data ClientResources = ClientResources

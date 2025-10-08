@@ -51,6 +51,7 @@ getToken = do
   clientResources <- HttpT.askClientResources
   case HttpT.crTargetResorces clientResources of
     HttpT.Emulator             -> return Nothing
+    HttpT.Implicit             -> return Nothing
     HttpT.Cloud cloudResources -> Just <$> do
       let manager   = HttpT.crManager clientResources
           tokenMVar = HttpT.ctrCachedTokenMVar cloudResources
