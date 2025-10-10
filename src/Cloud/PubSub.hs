@@ -46,21 +46,16 @@ mkClientResources projectId target = do
       let hostAndPortUrl = "http://" <> unwrapHostAndPort hostAndPort
       return (hostAndPortUrl, Emulator)
     CloudServiceTarget (CloudConfig threshold authM) ->
-      do
-        resources <- case authM of
-          ServiceAccountFile saFile -> do
-            sa <- Auth.readServiceAccountFile saFile
-            CloudTargetResources
-              <$> pure (AuthT.FromServiceAccount sa)
-              <*> MVar.newMVar NotInitialized
-              <*> pure threshold
-          MetadataServer ->
-            CloudTargetResources
-              <$> pure AuthT.FromMetadataServer
-              <*> MVar.newMVar NotInitialized
-              <*> pure threshold
-        let serviceUrl = "https://pubsub.googleapis.com"
-        return (serviceUrl, Cloud resources)
+        do
+          tokenVar   <- MVar.newMVar NotInitialized
+          authSource <- case authM of
+            ServiceAccountFile saFile ->
+              AuthT.FromServiceAccount <$> Auth.readServiceAccountFile saFile
+            MetadataServer ->
+              pure AuthT.FromMetadataServer
+          let resources  = CloudTargetResources authSource tokenVar threshold
+              serviceUrl = "https://pubsub.googleapis.com"
+          return (serviceUrl, Cloud resources)
   -- Manager closed automatically
   manager <- HttpClient.newManager HttpClientTLS.tlsManagerSettings
   return $ ClientResources manager url projectId targetResources
