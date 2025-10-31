@@ -115,6 +115,7 @@ tests:
       - async
       - bytestring
       - cloud-pubsub
+      - directory
       - exceptions
       - hspec
       # See https://github.com/input-output-hk/haskell.nix/issues/231
