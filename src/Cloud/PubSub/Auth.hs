@@ -20,7 +20,6 @@ import           Data.Functor                   ( (<&>) )
 import           GHC.Generics                   ( Generic )
 import qualified Data.Text                     as Text
 import qualified Data.Text.Encoding            as TE
-import           Data.Time                      ( Time )
 import qualified Data.Time                     as Time
 import qualified Network.HTTP.Client.Conduit   as HttpClientC
 import qualified Network.HTTP.Simple           as HTTP
