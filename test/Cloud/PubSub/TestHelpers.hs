@@ -174,12 +174,19 @@ getPubSubTarget renewThreshold = do
                   $ PubSub.CloudServiceTarget
                   $ PubSub.CloudConfig renewThreshold authMethod
             Right v ->
-              case Aeson.parseMaybe (Aeson.withObject "credentials" $ \o -> o Aeson.:? "type") v of
-                Just (Just (Aeson.String "authorized_user")) ->
-                  let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
-                  in  return
-                      $ PubSub.CloudServiceTarget
-                      $ PubSub.CloudConfig renewThreshold authMethod
+              case v of
+                Aeson.Object obj ->
+                  case obj Aeson..:? "type" of
+                    Just (Aeson.String "authorized_user") ->
+                      let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+                      in  return
+                          $ PubSub.CloudServiceTarget
+                          $ PubSub.CloudConfig renewThreshold authMethod
+                    _ ->
+                      let authMethod = PubSub.ServiceAccountFile credFile
+                      in  return
+                          $ PubSub.CloudServiceTarget
+                          $ PubSub.CloudConfig renewThreshold authMethod
                 _ ->
                   let authMethod = PubSub.ServiceAccountFile credFile
                   in  return
