@@ -14,6 +14,13 @@ jobs:
           enable-stack: true
           stack-no-global: true
           stack-version: "3.3.1"
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+        continue-on-error: false
       - name: Cache Stack Dependencies
         uses: actions/cache@v4
         with:
@@ -26,11 +33,6 @@ jobs:
             - ${{ runner.os }}-
       - name: Install Dependencies
         run: stack install --only-dependencies --test
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - name: Run Tests
         run: stack test
         env:
