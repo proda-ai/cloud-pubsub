@@ -4,6 +4,7 @@ module Cloud.PubSub.Auth
   , fetchMetadataToken
   , readApplicationDefaultCredentialsFile
   , fetchApplicationDefaultCredentialsToken
+  , ADCCredentials(..)
   ) where
 
 import qualified Cloud.PubSub.Auth.Types       as AuthT
@@ -34,7 +35,7 @@ data ADCCredentials = ADCCredentials
   , adcClientSecret :: Text.Text
   , adcRefreshToken :: Text.Text
   }
-  deriving stock (Generic)
+  deriving stock (Generic, Show)
 
 instance Aeson.FromJSON ADCCredentials where
   parseJSON = Aeson.genericParseJSON $ Aeson.defaultOptions

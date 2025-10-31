@@ -155,6 +155,15 @@ getProjectId :: IO (Maybe Core.ProjectId)
 getProjectId =
   fmap (Core.ProjectId . Text.pack) <$> SystemEnv.lookupEnv "PROJECT_ID"
 
+-- Helper to check if a file contains ADC credentials
+tryParseADC :: FilePath -> IO (Maybe Bool)
+tryParseADC filePath = do
+  result <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (Auth.ADCCredentials))
+  case result of
+    Right (Auth.ADCCredentials t _ _ _) ->
+      return $ Just (t == Text.pack "authorized_user")
+    Left _ -> return Nothing
+
 getPubSubTarget :: NominalDiffTime -> IO PubSub.PubSubTarget
 getPubSubTarget renewThreshold = do
   maybeEmulatorHost <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST"
@@ -166,29 +175,18 @@ getPubSubTarget renewThreshold = do
       maybeCredFile <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
       case maybeCredFile of
         Just credFile -> do
-          -- Try to detect if it's ADC or service account by checking JSON structure
-          -- First try to parse as a JSON object and check for "type" field
-          credJSONE <- Aeson.eitherDecodeFileStrict credFile
-          case credJSONE of
-            Right (Aeson.Object obj) -> do
-              -- Try to extract "type" field using Parser
-              let typeParser = Aeson.withObject "credentials" $ \o -> o Aeson..:? "type"
-                  typeResult = Aeson.parseEither typeParser (Aeson.Object obj)
-              case typeResult of
-                Right (Just (Aeson.String "authorized_user")) ->
-                  -- It's ADC format
-                  let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
-                  in  return
-                      $ PubSub.CloudServiceTarget
-                      $ PubSub.CloudConfig renewThreshold authMethod
-                _ ->
-                  -- Not ADC format, treat as service account
-                  let authMethod = PubSub.ServiceAccountFile credFile
-                  in  return
-                      $ PubSub.CloudServiceTarget
-                      $ PubSub.CloudConfig renewThreshold authMethod
+          -- Try to detect if it's ADC or service account by trying to parse as ADC first
+          -- We'll use a helper that checks if it can be parsed as ADCCredentials
+          adcParseResult <- tryParseADC credFile
+          case adcParseResult of
+            Just True ->
+              -- Successfully parsed as ADC with authorized_user type
+              let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+              in  return
+                  $ PubSub.CloudServiceTarget
+                  $ PubSub.CloudConfig renewThreshold authMethod
             _ ->
-              -- Not a JSON object or parse failed, treat as service account
+              -- Either parsing failed or not ADC format, treat as service account
               let authMethod = PubSub.ServiceAccountFile credFile
               in  return
                   $ PubSub.CloudServiceTarget
