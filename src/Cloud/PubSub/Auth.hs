@@ -29,10 +29,10 @@ readServiceAccountFile fp =
   liftIO $ Aeson.eitherDecodeFileStrict fp >>= either fail return
 
 data ADCCredentials = ADCCredentials
-  { adcType         :: Text
-  , adcClientId     :: Text
-  , adcClientSecret :: Text
-  , adcRefreshToken :: Text
+  { adcType         :: Text.Text
+  , adcClientId     :: Text.Text
+  , adcClientSecret :: Text.Text
+  , adcRefreshToken :: Text.Text
   }
   deriving stock (Generic)
 
