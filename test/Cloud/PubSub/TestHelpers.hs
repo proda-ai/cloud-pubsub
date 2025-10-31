@@ -1,6 +1,7 @@
 module Cloud.PubSub.TestHelpers where
 
 import qualified Cloud.PubSub                  as PubSub
+import qualified Cloud.PubSub.Auth             as Auth
 import           Cloud.PubSub.Core.Types        ( Message(..)
                                                 , TopicName
                                                 )
@@ -8,6 +9,7 @@ import qualified Cloud.PubSub.Core.Types       as Core
 import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Logger           as Logger
 import qualified Data.Aeson                    as Aeson
+import qualified Data.Text                     as Text
 import qualified Cloud.PubSub.Snapshot         as Snapshot
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT.NewSnapshot
@@ -164,34 +166,33 @@ getPubSubTarget renewThreshold = do
       maybeCredFile <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
       case maybeCredFile of
         Just credFile -> do
-          -- Try to detect if it's ADC or service account by parsing JSON
+          -- Try to detect if it's ADC or service account by checking JSON structure
+          -- First try to parse as a JSON object and check for "type" field
           credJSONE <- Aeson.eitherDecodeFileStrict credFile
           case credJSONE of
-            Left _ ->
-              -- If JSON parsing fails, treat as service account (backward compatibility)
-              let authMethod = PubSub.ServiceAccountFile credFile
-              in  return
-                  $ PubSub.CloudServiceTarget
-                  $ PubSub.CloudConfig renewThreshold authMethod
-            Right v ->
-              case v of
-                Aeson.Object obj ->
-                  case obj Aeson..:? "type" of
-                    Just (Aeson.String "authorized_user") ->
-                      let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
-                      in  return
-                          $ PubSub.CloudServiceTarget
-                          $ PubSub.CloudConfig renewThreshold authMethod
-                    _ ->
-                      let authMethod = PubSub.ServiceAccountFile credFile
-                      in  return
-                          $ PubSub.CloudServiceTarget
-                          $ PubSub.CloudConfig renewThreshold authMethod
+            Right (Aeson.Object obj) -> do
+              -- Try to extract "type" field using Parser
+              let typeParser = Aeson.withObject "credentials" $ \o -> o Aeson..:? "type"
+                  typeResult = Aeson.parseEither typeParser (Aeson.Object obj)
+              case typeResult of
+                Right (Just (Aeson.String "authorized_user")) ->
+                  -- It's ADC format
+                  let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+                  in  return
+                      $ PubSub.CloudServiceTarget
+                      $ PubSub.CloudConfig renewThreshold authMethod
                 _ ->
+                  -- Not ADC format, treat as service account
                   let authMethod = PubSub.ServiceAccountFile credFile
                   in  return
                       $ PubSub.CloudServiceTarget
                       $ PubSub.CloudConfig renewThreshold authMethod
+            _ ->
+              -- Not a JSON object or parse failed, treat as service account
+              let authMethod = PubSub.ServiceAccountFile credFile
+              in  return
+                  $ PubSub.CloudServiceTarget
+                  $ PubSub.CloudConfig renewThreshold authMethod
         Nothing -> do
           -- Try default ADC location if GOOGLE_APPLICATION_CREDENTIALS not set
           maybeHome <- SystemEnv.lookupEnv "HOME"
