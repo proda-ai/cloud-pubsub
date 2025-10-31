@@ -32,9 +32,9 @@ import qualified Data.HashMap.Strict           as HM
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           Data.Time                      ( NominalDiffTime )
+import qualified System.Directory             as SystemDir
 import qualified System.Environment            as SystemEnv
 import qualified System.IO                     as SystemIO
-import           System.IO                     ( doesFileExist )
 import           Test.Hspec                     ( pendingWith )
 
 newtype TestEnv = TestEnv
@@ -185,7 +185,7 @@ getPubSubTarget renewThreshold = do
           case maybeHome of
             Just homeDir -> do
               let defaultADC = homeDir <> "/.config/gcloud/application_default_credentials.json"
-              adcExists <- SystemIO.doesFileExist defaultADC
+              adcExists <- SystemDir.doesFileExist defaultADC
               if adcExists
                 then let authMethod = PubSub.ApplicationDefaultCredentialsFile defaultADC
                      in  return
