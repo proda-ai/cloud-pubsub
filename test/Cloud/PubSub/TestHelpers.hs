@@ -165,20 +165,26 @@ getPubSubTarget renewThreshold = do
       case maybeCredFile of
         Just credFile -> do
           -- Try to detect if it's ADC or service account by parsing JSON
-          credJSON <- Aeson.eitherDecodeFileStrict credFile >>= \case
-            Left _ -> return Nothing
-            Right v -> return $ Just v
-          case credJSON >>= Aeson.lookup "type" of
-            Just (Aeson.String "authorized_user") ->
-              let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+          credJSONE <- Aeson.eitherDecodeFileStrict credFile
+          case credJSONE of
+            Left _ ->
+              -- If JSON parsing fails, treat as service account (backward compatibility)
+              let authMethod = PubSub.ServiceAccountFile credFile
               in  return
                   $ PubSub.CloudServiceTarget
                   $ PubSub.CloudConfig renewThreshold authMethod
-            _ ->
-              let authMethod = PubSub.ServiceAccountFile credFile
-                 in  return
-                     $ PubSub.CloudServiceTarget
-                     $ PubSub.CloudConfig renewThreshold authMethod
+            Right v ->
+              case Aeson.parseMaybe (Aeson.withObject "credentials" $ \o -> o Aeson.:? "type") v of
+                Just (Just (Aeson.String "authorized_user")) ->
+                  let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+                  in  return
+                      $ PubSub.CloudServiceTarget
+                      $ PubSub.CloudConfig renewThreshold authMethod
+                _ ->
+                  let authMethod = PubSub.ServiceAccountFile credFile
+                  in  return
+                      $ PubSub.CloudServiceTarget
+                      $ PubSub.CloudConfig renewThreshold authMethod
         Nothing -> do
           -- Try default ADC location if GOOGLE_APPLICATION_CREDENTIALS not set
           maybeHome <- SystemEnv.lookupEnv "HOME"
