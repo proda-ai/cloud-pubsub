@@ -10,13 +10,20 @@ import           Test.Hspec
 tokenGetTest :: IO ()
 tokenGetTest = do
   manager        <- HttpClient.newManager HttpClientTLS.tlsManagerSettings
-  SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS" >>= \case
-    Nothing -> pendingWith "skipping as auth not supported in emulator"
-    Just serviceAccountPath -> do
-      serviceAccount <- Auth.readServiceAccountFile serviceAccountPath
-      tokenResponse  <- Auth.fetchToken manager serviceAccount scope
-      AuthT.tokenType tokenResponse `shouldBe` "Bearer"
-      AuthT.expiresIn tokenResponse `shouldSatisfy` (\t -> 3595 < t && t < 3600)
+  SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST" >>= \case
+    Just _ -> pendingWith "skipping as auth not supported in emulator"
+    Nothing -> do
+      SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS" >>= \case
+        Just serviceAccountPath -> do
+          serviceAccount <- Auth.readServiceAccountFile serviceAccountPath
+          tokenResponse  <- Auth.fetchToken manager serviceAccount scope
+          AuthT.tokenType tokenResponse `shouldBe` "Bearer"
+          AuthT.expiresIn tokenResponse `shouldSatisfy` (\t -> 3595 < t && t < 3600)
+        Nothing -> do
+          -- Try metadata server
+          tokenResponse <- Auth.fetchMetadataToken manager scope
+          AuthT.tokenType tokenResponse `shouldBe` "Bearer"
+          AuthT.expiresIn tokenResponse `shouldSatisfy` (\t -> 3595 < t && t < 3600)
       where scope = "https://www.googleapis.com/auth/pubsub"
 
 spec :: Spec

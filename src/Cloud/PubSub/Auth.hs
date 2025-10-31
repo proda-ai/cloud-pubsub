@@ -2,6 +2,8 @@ module Cloud.PubSub.Auth
   ( fetchToken
   , readServiceAccountFile
   , fetchMetadataToken
+  , readApplicationDefaultCredentialsFile
+  , fetchApplicationDefaultCredentialsToken
   ) where
 
 import qualified Cloud.PubSub.Auth.Types       as AuthT
@@ -24,6 +26,30 @@ import qualified Network.HTTP.Simple           as HTTP
 readServiceAccountFile :: MonadIO m => FilePath -> m AuthT.ServiceAccount
 readServiceAccountFile fp =
   liftIO $ Aeson.eitherDecodeFileStrict fp >>= either fail return
+
+data ADCCredentials = ADCCredentials
+  { adcType         :: Text
+  , adcClientId     :: Text
+  , adcClientSecret :: Text
+  , adcRefreshToken :: Text
+  }
+  deriving stock (Generic)
+
+instance Aeson.FromJSON ADCCredentials where
+  parseJSON = Aeson.genericParseJSON $ Aeson.defaultOptions
+    { Aeson.fieldLabelModifier = Aeson.camelTo2 '_' . drop 3
+    }
+
+readApplicationDefaultCredentialsFile :: MonadIO m => FilePath -> m AuthT.ApplicationDefaultCredentials
+readApplicationDefaultCredentialsFile fp = liftIO $ do
+  adc <- Aeson.eitherDecodeFileStrict fp >>= either fail return
+  if adcType adc == "authorized_user"
+    then return $ AuthT.ApplicationDefaultCredentials
+      { AuthT.adcClientId     = adcClientId adc
+      , AuthT.adcClientSecret = adcClientSecret adc
+      , AuthT.adcRefreshToken = adcRefreshToken adc
+      }
+    else fail $ "Unsupported ADC credentials type: " <> Text.unpack (adcType adc)
 
 createAssertionTokenBody
   :: AuthT.PrivateKeyId -> AuthT.TokenClaims -> ByteString
@@ -103,6 +129,32 @@ fetchMetadataToken manager scope = liftIO $ do
     HTTP.parseRequest ("GET " <> metadataTokenUrl)
       <&> ( HTTP.setRequestQueryString query
           . HTTP.addRequestHeader "Metadata-Flavor" "Google"
+          . HTTP.setRequestManager manager
+          )
+  response <- HTTP.httpJSON request
+  return $ HTTP.getResponseBody response
+
+-- | Fetches a GCP access token using Application Default Credentials (from gcloud auth application-default login)
+-- Implements the OAuth2 refresh token flow described here:
+-- https://developers.google.com/identity/protocols/oauth2/web-server#offline
+fetchApplicationDefaultCredentialsToken
+  :: MonadIO m
+  => HttpClientC.Manager
+  -> AuthT.ApplicationDefaultCredentials
+  -> AuthT.Scope
+  -> m AuthT.AccessTokenResponse
+fetchApplicationDefaultCredentialsToken manager adc scope = liftIO $ do
+  let tokenUrl = "https://oauth2.googleapis.com/token"
+      formData =
+        [ ("client_id"    , TE.encodeUtf8 $ AuthT.adcClientId adc)
+        , ("client_secret", TE.encodeUtf8 $ AuthT.adcClientSecret adc)
+        , ("refresh_token" , TE.encodeUtf8 $ AuthT.adcRefreshToken adc)
+        , ("grant_type"   , "refresh_token")
+        , ("scope"        , TE.encodeUtf8 $ AuthT.unwrapScope scope)
+        ]
+  request <-
+    HTTP.parseRequest ("POST " <> tokenUrl)
+      <&> ( HTTP.setRequestBodyURLEncoded formData
           . HTTP.setRequestManager manager
           )
   response <- HTTP.httpJSON request

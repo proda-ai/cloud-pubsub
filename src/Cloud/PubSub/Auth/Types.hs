@@ -7,6 +7,7 @@ module Cloud.PubSub.Auth.Types
   , Scope(..)
   , ServiceAccount(..)
   , TokenSource(..)
+  , ApplicationDefaultCredentials(..)
   , TokenClaims(..)
   , UnixEpochSeconds(..)
   , X509PrivateKey(..)
@@ -62,8 +63,15 @@ instance Aeson.FromJSON ServiceAccount where
     { Aeson.fieldLabelModifier = Aeson.camelTo2 '_' . drop 2
     }
 
+data ApplicationDefaultCredentials = ApplicationDefaultCredentials
+  { adcClientId     :: Text
+  , adcClientSecret :: Text
+  , adcRefreshToken :: Text
+  }
+
 data TokenSource = FromServiceAccount ServiceAccount
                  | FromMetadataServer
+                 | FromApplicationDefaultCredentials ApplicationDefaultCredentials
 
 newtype AccessToken = AccessToken
   { unwrapAccessToken :: Text

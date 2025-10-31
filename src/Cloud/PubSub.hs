@@ -24,6 +24,7 @@ import qualified Network.HTTP.Client.TLS       as HttpClientTLS
 
 data AuthMethod = ServiceAccountFile FilePath
                 | MetadataServer
+                | ApplicationDefaultCredentialsFile FilePath
   deriving (Show, Eq)
 
 newtype HostAndPort = HostAndPort { unwrapHostAndPort :: String }
@@ -53,6 +54,8 @@ mkClientResources projectId target = do
               AuthT.FromServiceAccount <$> Auth.readServiceAccountFile saFile
             MetadataServer ->
               pure AuthT.FromMetadataServer
+            ApplicationDefaultCredentialsFile adcFile ->
+              AuthT.FromApplicationDefaultCredentials <$> Auth.readApplicationDefaultCredentialsFile adcFile
           let resources  = CloudTargetResources authSource tokenVar threshold
               serviceUrl = "https://pubsub.googleapis.com"
           return (serviceUrl, Cloud resources)

@@ -7,6 +7,7 @@ import           Cloud.PubSub.Core.Types        ( Message(..)
 import qualified Cloud.PubSub.Core.Types       as Core
 import qualified Cloud.PubSub.Http.Types       as HttpT
 import qualified Cloud.PubSub.Logger           as Logger
+import qualified Data.Aeson                    as Aeson
 import qualified Cloud.PubSub.Snapshot         as Snapshot
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT
 import qualified Cloud.PubSub.Snapshot.Types   as SnapshotT.NewSnapshot
@@ -33,6 +34,7 @@ import qualified Data.Text                     as Text
 import           Data.Time                      ( NominalDiffTime )
 import qualified System.Environment            as SystemEnv
 import qualified System.IO                     as SystemIO
+import           System.IO                     ( doesFileExist )
 import           Test.Hspec                     ( pendingWith )
 
 newtype TestEnv = TestEnv
@@ -154,34 +156,66 @@ getProjectId =
 getPubSubTarget :: NominalDiffTime -> IO PubSub.PubSubTarget
 getPubSubTarget renewThreshold = do
   maybeEmulatorHost <- SystemEnv.lookupEnv "PUBSUB_EMULATOR_HOST"
-  maybeSaFile       <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
-  case (maybeEmulatorHost, maybeSaFile) of
-    (Just hostAndPortStr, Nothing) ->
+  case maybeEmulatorHost of
+    Just hostAndPortStr ->
       return $ PubSub.EmulatorTarget $ PubSub.HostAndPort hostAndPortStr
-    (Nothing, Just saFile) ->
-      let authMethod = PubSub.ServiceAccountFile saFile
-      in  return
-          $ PubSub.CloudServiceTarget
-          $ PubSub.CloudConfig renewThreshold authMethod
-    (_, _) ->
-      error
-        "Please specify either \"PUBSUB_EMULATOR_HOST\" or \
-        \\"GOOGLE_APPLICATION_CREDENTIALS\" depending whether you to run \
-        \the tests against the emulator or the cloud hosted version."
+    Nothing -> do
+      -- Check for GOOGLE_APPLICATION_CREDENTIALS (could be service account or ADC)
+      maybeCredFile <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
+      case maybeCredFile of
+        Just credFile -> do
+          -- Try to detect if it's ADC or service account by parsing JSON
+          credJSON <- Aeson.eitherDecodeFileStrict credFile >>= \case
+            Left _ -> return Nothing
+            Right v -> return $ Just v
+          case credJSON >>= Aeson.lookup "type" of
+            Just (Aeson.String "authorized_user") ->
+              let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+              in  return
+                  $ PubSub.CloudServiceTarget
+                  $ PubSub.CloudConfig renewThreshold authMethod
+            _ ->
+              let authMethod = PubSub.ServiceAccountFile credFile
+                 in  return
+                     $ PubSub.CloudServiceTarget
+                     $ PubSub.CloudConfig renewThreshold authMethod
+        Nothing -> do
+          -- Try default ADC location if GOOGLE_APPLICATION_CREDENTIALS not set
+          maybeHome <- SystemEnv.lookupEnv "HOME"
+          case maybeHome of
+            Just homeDir -> do
+              let defaultADC = homeDir <> "/.config/gcloud/application_default_credentials.json"
+              adcExists <- SystemIO.doesFileExist defaultADC
+              if adcExists
+                then let authMethod = PubSub.ApplicationDefaultCredentialsFile defaultADC
+                     in  return
+                         $ PubSub.CloudServiceTarget
+                         $ PubSub.CloudConfig renewThreshold authMethod
+                else -- Fall back to metadata server (for GCP VMs)
+                  let authMethod = PubSub.MetadataServer
+                  in  return
+                      $ PubSub.CloudServiceTarget
+                      $ PubSub.CloudConfig renewThreshold authMethod
+            Nothing -> -- Fall back to metadata server (for GCP VMs)
+              let authMethod = PubSub.MetadataServer
+              in  return
+                  $ PubSub.CloudServiceTarget
+                  $ PubSub.CloudConfig renewThreshold authMethod
 
 usageMessage :: String
 usageMessage = unlines
   [ "Missing config: Tests can be run against the hosted Cloud PubSub service \
     \or the emulator. The emulator does not have full API coverage and as such \
     \some tests are not run when the tests are with the emulator."
-  , "To run tests with the hosted Cloud PubSub, please set the enviroment \
-    \variable \"GOOGLE_APPLICATION_CREDENTIALS\" to the path to the \
-    \service account keys in JSON format and specify Google Cloud Project ID \
-    \via the \"PROJECT_ID\" environment variable. Given that service accounts \
-    \can be used across projects \"project_id\" field in the JSON key file \
-    \is ignored."
-  , "To run against the emulator please start the emulator and set the \
-    \\"PUBSUB_EMULATOR_HOST\" and the \"PROJECT_ID\" environment variables."
+  , "To run tests with the hosted Cloud PubSub:"
+  , "  Option 1 (recommended for local): Run 'gcloud auth application-default login' \
+    \then set \"PROJECT_ID\" environment variable"
+  , "  Option 2 (legacy): Set \"GOOGLE_APPLICATION_CREDENTIALS\" to the path \
+    \to service account keys in JSON format and \"PROJECT_ID\""
+  , "  Option 3 (GCP VM/CI): Use metadata server authentication (default when \
+    \GOOGLE_APPLICATION_CREDENTIALS is not set and ADC file doesn't exist)"
+  , "To run against the emulator: Start the emulator and set \"PUBSUB_EMULATOR_HOST\" \
+    \and \"PROJECT_ID\" environment variables."
   ]
 
 mkTestPubSubEnvWithRenewThreshold :: NominalDiffTime -> IO TestEnv
