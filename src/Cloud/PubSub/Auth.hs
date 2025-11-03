@@ -14,6 +14,7 @@ import           Crypto.PubKey.RSA              ( PrivateKey )
 import qualified Crypto.PubKey.RSA.PKCS15      as RSA
 import qualified Data.Aeson                    as Aeson
 import           Data.Aeson                     ( (.=) )
+import qualified Data.HashMap.Strict           as HashMap
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Base64.URL    as Base64
 import qualified Data.ByteString.Lazy          as LBS
@@ -61,7 +62,7 @@ readApplicationDefaultCredentialsFile fp = liftIO $ do
       rawResult <- Aeson.eitherDecodeFileStrict fp :: IO (Either String Aeson.Value)
       case rawResult of
         Right (Aeson.Object obj) ->
-          case Aeson.lookup "type" obj of
+          case HashMap.lookup (Text.pack "type") obj of
             Just (Aeson.String credType) ->
               fail $ "Unsupported credential type: " <> Text.unpack credType <>
                      ". Expected 'authorized_user' ADC format with client_id, client_secret, and refresh_token fields."
