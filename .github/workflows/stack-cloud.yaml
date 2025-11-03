@@ -8,7 +8,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      WIF_PROVIDER: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+      WIF_PROVIDER: projects/3367369000/locations/global/workloadIdentityPools/wip-github-yqou
       WIF_SERVICE_ACCOUNT: sa-ci-cloud-pubsub@proda-ci.iam.gserviceaccount.com
     steps:
       - uses: actions/checkout@v2
