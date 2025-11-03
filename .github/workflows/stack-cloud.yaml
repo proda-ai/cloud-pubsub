@@ -18,7 +18,7 @@ jobs:
         name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: projects/3367369000/locations/global/workloadIdentityPools/wip-github-yqou
+          workload_identity_provider: projects/3367369000/locations/global/workloadIdentityPools/wip-github-yqou/providers/wip-provider-github
           service_account: sa-ci-cloud-pubsub@proda-ci.iam.gserviceaccount.com
           create_credentials_file: true
           export_environment_variables: true
