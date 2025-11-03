@@ -2,6 +2,7 @@ module Cloud.PubSub.TestHelpers where
 
 import qualified Cloud.PubSub                  as PubSub
 import qualified Cloud.PubSub.Auth             as Auth
+import qualified Cloud.PubSub.Auth.Types       as AuthT
 import           Cloud.PubSub.Core.Types        ( Message(..)
                                                 , TopicName
                                                 )
@@ -156,13 +157,22 @@ getProjectId =
   fmap (Core.ProjectId . Text.pack) <$> SystemEnv.lookupEnv "PROJECT_ID"
 
 -- Helper to check if a file contains ADC credentials
-tryParseADC :: FilePath -> IO (Maybe Bool)
-tryParseADC filePath = do
-  result <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (Auth.ADCCredentials))
-  case result of
+-- Returns: Just True if ADC, Just False if ServiceAccount, Nothing if neither
+detectCredentialType :: FilePath -> IO (Maybe Bool)
+detectCredentialType filePath = do
+  -- First try to parse as ADC
+  adcResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (Auth.ADCCredentials))
+  case adcResult of
     Right (Auth.ADCCredentials t _ _ _) ->
-      return $ Just (t == Text.pack "authorized_user")
-    Left _ -> return Nothing
+      if t == Text.pack "authorized_user"
+        then return $ Just True  -- It's ADC
+        else return Nothing      -- Unknown type in ADC format
+    Left _ -> do
+      -- Try to parse as ServiceAccount
+      saResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (AuthT.ServiceAccount))
+      case saResult of
+        Right _ -> return $ Just False  -- It's a ServiceAccount
+        Left _  -> return Nothing       -- Can't parse as either
 
 getPubSubTarget :: NominalDiffTime -> IO PubSub.PubSubTarget
 getPubSubTarget renewThreshold = do
@@ -175,22 +185,24 @@ getPubSubTarget renewThreshold = do
       maybeCredFile <- SystemEnv.lookupEnv "GOOGLE_APPLICATION_CREDENTIALS"
       case maybeCredFile of
         Just credFile -> do
-          -- Try to detect if it's ADC or service account by trying to parse as ADC first
-          -- We'll use a helper that checks if it can be parsed as ADCCredentials
-          adcParseResult <- tryParseADC credFile
-          case adcParseResult of
+          -- Try to detect if it's ADC or service account
+          credType <- detectCredentialType credFile
+          case credType of
             Just True ->
-              -- Successfully parsed as ADC with authorized_user type
+              -- It's ADC
               let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
               in  return
                   $ PubSub.CloudServiceTarget
                   $ PubSub.CloudConfig renewThreshold authMethod
-            _ ->
-              -- Either parsing failed or not ADC format, treat as service account
+            Just False ->
+              -- It's a ServiceAccount
               let authMethod = PubSub.ServiceAccountFile credFile
               in  return
                   $ PubSub.CloudServiceTarget
                   $ PubSub.CloudConfig renewThreshold authMethod
+            Nothing ->
+              -- Can't determine type, give helpful error
+              error $ "Could not parse credentials file as ADC or ServiceAccount: " <> credFile
         Nothing -> do
           -- Try default ADC location if GOOGLE_APPLICATION_CREDENTIALS not set
           maybeHome <- SystemEnv.lookupEnv "HOME"
