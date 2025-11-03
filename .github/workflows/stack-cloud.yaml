@@ -4,6 +4,9 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v2
       - uses: haskell-actions/setup@v2
@@ -11,8 +14,21 @@ jobs:
           enable-stack: true
           stack-no-global: true
           stack-version: "3.3.1"
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/3367369000/locations/global/workloadIdentityPools/wip-github-yqou/providers/wip-provider-github
+          service_account: sa-ci-cloud-pubsub@proda-ci.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+          universe: googleapis.com
+          cleanup_credentials: true
+          access_token_lifetime: 3600s
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform
+          id_token_include_email: false
       - name: Cache Stack Dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             ~/.stack
@@ -23,12 +39,7 @@ jobs:
             - ${{ runner.os }}-
       - name: Install Dependencies
         run: stack install --only-dependencies --test
-      - run: 'mkdir secrets && echo "$GCP_SA_KEY" > ./secrets/service_account.json'
-        shell: bash
-        env:
-          GCP_SA_KEY: ${{secrets.GCP_SA_KEY}}
       - name: Run Tests
         run: stack test
         env:
           PROJECT_ID: ${{secrets.PROJECT_ID}}
-          GOOGLE_APPLICATION_CREDENTIALS: ./secrets/service_account.json
