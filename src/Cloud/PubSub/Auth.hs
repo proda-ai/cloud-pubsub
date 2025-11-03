@@ -44,14 +44,32 @@ instance Aeson.FromJSON ADCCredentials where
 
 readApplicationDefaultCredentialsFile :: MonadIO m => FilePath -> m AuthT.ApplicationDefaultCredentials
 readApplicationDefaultCredentialsFile fp = liftIO $ do
-  adc <- Aeson.eitherDecodeFileStrict fp >>= either fail return
-  if adcType adc == "authorized_user"
-    then return $ AuthT.ApplicationDefaultCredentials
-      { AuthT.adcClientId     = adcClientId adc
-      , AuthT.adcClientSecret = adcClientSecret adc
-      , AuthT.adcRefreshToken = adcRefreshToken adc
-      }
-    else fail $ "Unsupported ADC credentials type: " <> Text.unpack (adcType adc)
+  result <- Aeson.eitherDecodeFileStrict fp :: IO (Either String ADCCredentials)
+  case result of
+    Right adc | adcType adc == Text.pack "authorized_user" ->
+      return $ AuthT.ApplicationDefaultCredentials
+        { AuthT.adcClientId     = adcClientId adc
+        , AuthT.adcClientSecret = adcClientSecret adc
+        , AuthT.adcRefreshToken = adcRefreshToken adc
+        }
+    Right adc ->
+      fail $ "Unsupported ADC credentials type: " <> Text.unpack (adcType adc) <>
+             ". Only 'authorized_user' type is supported. For WIF/impersonated service accounts," <>
+             " please use environment variables or a supported credential format."
+    Left err -> do
+      -- Try to read as raw JSON to provide better error message
+      rawResult <- Aeson.eitherDecodeFileStrict fp :: IO (Either String Aeson.Value)
+      case rawResult of
+        Right (Aeson.Object obj) ->
+          case Aeson.lookup "type" obj of
+            Just (Aeson.String credType) ->
+              fail $ "Unsupported credential type: " <> Text.unpack credType <>
+                     ". Expected 'authorized_user' ADC format with client_id, client_secret, and refresh_token fields."
+            _ ->
+              fail $ "Could not parse credentials file. Expected ADC format with 'authorized_user' type. " <>
+                     "Parse error: " <> err
+        _ ->
+          fail $ "Could not parse credentials file as JSON. Parse error: " <> err
 
 createAssertionTokenBody
   :: AuthT.PrivateKeyId -> AuthT.TokenClaims -> ByteString

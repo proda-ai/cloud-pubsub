@@ -160,19 +160,31 @@ getProjectId =
 -- Returns: Just True if ADC, Just False if ServiceAccount, Nothing if neither
 detectCredentialType :: FilePath -> IO (Maybe Bool)
 detectCredentialType filePath = do
-  -- First try to parse as ADC
-  adcResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (Auth.ADCCredentials))
-  case adcResult of
-    Right (Auth.ADCCredentials t _ _ _) ->
-      if t == Text.pack "authorized_user"
-        then return $ Just True  -- It's ADC
-        else return Nothing      -- Unknown type in ADC format
+  -- First try to parse as ServiceAccount (has required fields that ADC doesn't)
+  saResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (AuthT.ServiceAccount))
+  case saResult of
+    Right _ -> return $ Just False  -- It's a ServiceAccount
     Left _ -> do
-      -- Try to parse as ServiceAccount
-      saResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (AuthT.ServiceAccount))
-      case saResult of
-        Right _ -> return $ Just False  -- It's a ServiceAccount
-        Left _  -> return Nothing       -- Can't parse as either
+      -- Try to parse as ADC (authorized_user type)
+      adcResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String (Auth.ADCCredentials))
+      case adcResult of
+        Right (Auth.ADCCredentials t _ _ _) ->
+          if t == Text.pack "authorized_user"
+            then return $ Just True  -- It's ADC with authorized_user
+            else return $ Just True  -- It's ADC but different type (e.g. impersonated_service_account), treat as ADC
+        Left _ -> do
+          -- Try to read as raw JSON to check for type field
+          rawResult <- Aeson.eitherDecodeFileStrict filePath :: IO (Either String Aeson.Value)
+          case rawResult of
+            Right (Aeson.Object obj) -> do
+              -- Check if it has a "type" field that suggests it's some form of credentials
+              case Aeson.lookup "type" obj of
+                Just (Aeson.String credType) ->
+                  if credType == Text.pack "service_account"
+                    then return $ Just False  -- It's a ServiceAccount (but parsing failed for some reason)
+                    else return $ Just True   -- It's some form of ADC or credential file
+                _ -> return Nothing  -- No type field, can't determine
+            _ -> return Nothing  -- Not an object, can't parse
 
 getPubSubTarget :: NominalDiffTime -> IO PubSub.PubSubTarget
 getPubSubTarget renewThreshold = do
@@ -200,9 +212,19 @@ getPubSubTarget renewThreshold = do
               in  return
                   $ PubSub.CloudServiceTarget
                   $ PubSub.CloudConfig renewThreshold authMethod
-            Nothing ->
-              -- Can't determine type, give helpful error
-              error $ "Could not parse credentials file as ADC or ServiceAccount: " <> credFile
+            Nothing -> do
+              -- Can't parse as either format, but file exists
+              -- This might be a WIF credentials file (e.g. impersonated_service_account type)
+              -- The google-github-actions/auth action creates credential files that Google's
+              -- client libraries can use but our custom parser doesn't support yet.
+              -- Since we can't parse it, we'll try to use it anyway - the error will be more
+              -- helpful if it fails. In practice, this should work with gcloud CLI or
+              -- Google's client libraries, but our custom implementation needs the file format.
+              -- For now, treat it as ADC and let readApplicationDefaultCredentialsFile handle the error.
+              let authMethod = PubSub.ApplicationDefaultCredentialsFile credFile
+              in  return
+                  $ PubSub.CloudServiceTarget
+                  $ PubSub.CloudConfig renewThreshold authMethod
         Nothing -> do
           -- Try default ADC location if GOOGLE_APPLICATION_CREDENTIALS not set
           maybeHome <- SystemEnv.lookupEnv "HOME"
